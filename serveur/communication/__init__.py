@@ -1,0 +1,1 @@
+"""Communication réseau du serveur."""

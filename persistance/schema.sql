@@ -1,0 +1,1 @@
+-- Le schéma sera défini lors de la conception du modèle de données.
