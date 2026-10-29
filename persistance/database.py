@@ -1,30 +1,36 @@
-"""Contrat d'accès à la base de données."""
+"""Accès à la base de données SQLite."""
 
-from typing import Any
+import sqlite3
 
 
 class Database:
-    """Définir l'accès à la base de données de l'application.
+    """Gérer les connexions SQLite de l'application.
 
-    Cette classe ne contient pas de modèle de données ni de requête SQL dans
-    le squelette architectural.
+    Cette classe fournit une connexion configurée pour préserver les relations
+    entre les données. Elle ne contient pas de logique métier.
     """
 
-    def connecter(self, chemin: str) -> Any:
-        """Établir une connexion à la base désignée.
+    def connecter(self, chemin: str) -> sqlite3.Connection:
+        """Ouvrir une connexion SQLite au chemin indiqué.
 
         Args:
-            chemin: Emplacement de la base de données.
+            chemin: Chemin de la base SQLite à ouvrir.
 
         Returns:
-            La connexion à la base de données.
+            La connexion SQLite configurée.
         """
-        pass
+        connexion = sqlite3.connect(chemin)
+        connexion.row_factory = sqlite3.Row
+        connexion.execute("PRAGMA foreign_keys = ON")
+        return connexion
 
-    def fermer(self) -> None:
+    def fermer(self, connexion: sqlite3.Connection) -> None:
         """Fermer la connexion à la base de données.
+
+        Args:
+            connexion: Connexion SQLite à fermer.
 
         Returns:
             None.
         """
-        pass
+        connexion.close()
