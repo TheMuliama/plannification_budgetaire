@@ -56,6 +56,7 @@ erDiagram
     COMPTES {
         INTEGER id PK
         INTEGER utilisateur_id FK
+        TEXT nom
         TEXT type
     }
 
