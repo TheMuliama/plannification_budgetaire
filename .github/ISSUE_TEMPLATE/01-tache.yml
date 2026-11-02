@@ -1,0 +1,45 @@
+name: Tâche
+description: Modifier ou développer un module du projet.
+title: "[TASK] "
+body:
+  - type: input
+    id: module
+    attributes:
+      label: Module concerné
+      description: Quel module doit être modifié ou développé ?
+      placeholder: "Gestionnaire des dépenses"
+    validations:
+      required: true
+
+  - type: input
+    id: collaborators
+    attributes:
+      label: Collaborateurs
+      description: Membres qui participent à cette tâche en plus du responsable.
+      placeholder: "@prenom1, @prenom2"
+    validations:
+      required: false
+
+  - type: input
+    id: deadline
+    attributes:
+      label: Deadline
+      description: Date à laquelle la tâche doit être terminée.
+      placeholder: "2026-11-04"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: validation
+    attributes:
+      label: Validation
+      description: Cocher chaque élément lorsque celui-ci est terminé.
+      options:
+        - label: Le module fonctionne conformément à sa responsabilité.
+        - label: Les fonctions ont été testées.
+        - label: Les tests passent.
+        - label: Les dépendances du module sont respectées.
+        - label: Le code a été relu par un autre membre.
+        - label: La Pull Request est prête à être fusionnée.
+    validations:
+      required: true
