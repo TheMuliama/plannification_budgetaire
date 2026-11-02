@@ -29,7 +29,7 @@ erDiagram
         INTEGER categorie_id FK
         INTEGER sous_categorie_id FK
         REAL montant_alloue
-        INTEGER obligatoire
+        BOOLEAN obligatoire
     }
 
     REVENUS {
@@ -53,6 +53,20 @@ erDiagram
         TEXT statut
     }
 
+    COMPTES {
+        INTEGER id PK
+        INTEGER utilisateur_id FK
+        TEXT nom
+        TEXT type
+    }
+
+    SOLDES {
+        INTEGER id PK
+        INTEGER compte_id FK
+        REAL solde
+        TEXT date_heure
+    }
+
     OBJECTIFS_EPARGNE {
         INTEGER id PK
         INTEGER utilisateur_id FK
@@ -63,13 +77,6 @@ erDiagram
         TEXT date_cible
     }
 
-    ETATS_SOLDES {
-        INTEGER id PK
-        INTEGER utilisateur_id FK
-        TEXT date_heure
-        REAL solde
-    }
-
     ALERTES {
         INTEGER id PK
         INTEGER utilisateur_id FK
@@ -77,9 +84,8 @@ erDiagram
         TEXT type
         TEXT message
         TEXT date_creation
-        INTEGER lue
+        BOOLEAN lue
     }
-
 
     UTILISATEURS ||--o{ CATEGORIES : "possède"
     CATEGORIES ||--o{ SOUS_CATEGORIES : "contient"
@@ -95,9 +101,10 @@ erDiagram
     CATEGORIES ||--o{ DEPENSES : "classe"
     SOUS_CATEGORIES ||--o{ DEPENSES : "précise"
 
-    UTILISATEURS ||--o{ OBJECTIFS_EPARGNE : "possède"
+    UTILISATEURS ||--|{ COMPTES : "possède"
+    COMPTES ||--|{ SOLDES : "possède"
 
-    UTILISATEURS ||--o{ ETATS_SOLDES : "possède"
+    UTILISATEURS ||--o{ OBJECTIFS_EPARGNE : "possède"
 
     UTILISATEURS ||--o{ ALERTES : "reçoit"
     BUDGETS ||--o{ ALERTES : "déclenche"
