@@ -14,6 +14,7 @@ from interface.connexion import Connexion
 from interface.inscription import VueInscription
 from interface.parametres import VueParametres
 from interface.alertes import VueAlertes
+from interface.factures import VueFactures
 
 
 class ApplicationMonBudget(ctk.CTk):
@@ -42,6 +43,7 @@ class ApplicationMonBudget(ctk.CTk):
         # Données temporaires
         self.transactions = []
         self.budgets = []
+        self.factures = []
         self.profil = {}
         self.theme = "Clair"
 
@@ -164,6 +166,7 @@ class ApplicationMonBudget(ctk.CTk):
             ("Transactions", "transactions"),
             ("Budgets", "budgets"),
             ("Alertes", "alertes"),
+            ("Factures", "factures"),
             ("Paramètres", "parametres")
         ]
 
@@ -269,6 +272,9 @@ class ApplicationMonBudget(ctk.CTk):
 
         elif page == "budgets":
             self.afficher_budgets()
+
+        elif page == "factures":
+            self.afficher_factures()
 
         elif page == "alertes":
             self.afficher_alertes()
@@ -402,6 +408,12 @@ class ApplicationMonBudget(ctk.CTk):
         # Alertes
         alertes = self.obtenir_alertes()
 
+        # Garder uniquement les alertes urgentes
+        alertes_urgentes = [
+            alerte for alerte in alertes
+            if alerte.get("type") in ("attention", "risque")
+        ]
+
         # Préparer toutes les données
         donnees = {
             "prenom": self.profil.get("prenom", ""),
@@ -411,12 +423,12 @@ class ApplicationMonBudget(ctk.CTk):
             "budget_mois": float(budget_total),
             "depense": float(total_depenses),
             "restant": float(restant),
-            "alertes_actives": len(alertes),
+            "alertes_actives": len(alertes_urgentes),
             "repartition": repartition,
             "budgets": budgets_dashboard,
             "evolution": evolution,
             "dernieres_depenses": dernieres_depenses,
-            "alertes": alertes
+            "alertes": alertes_urgentes
         }
 
         # Créer le tableau de bord
@@ -567,43 +579,85 @@ class ApplicationMonBudget(ctk.CTk):
     # ---------------------------------------
 
     def obtenir_alertes(self):
-        """Préparer les alertes à partir des budgets du mois."""
+        """Préparer les états des budgets du mois."""
 
         alertes = []
 
         for budget in self.calculer_budgets_affichage():
-            niveau = budget.get("alerte")
-
-            if niveau not in ("attention", "depasse"):
-                continue
-
             categorie = budget["categorie"]
-            progression = budget["progression"]
-            pourcentage = round(progression * 100)
 
-            if niveau == "depasse":
-                titre = f"Budget dépassé : {categorie}"
-                message = (
-                    f"Le budget {categorie} a atteint "
-                    f"{pourcentage} % de son plafond mensuel."
-                )
-            else:
-                titre = f"Budget à surveiller : {categorie}"
+            pourcentage = max(
+                0,
+                float(budget["progression"]) * 100
+            )
+
+            # ROUGE : risques et dépassements
+            if pourcentage >= 90:
+                niveau = "risque"
+
+                if pourcentage > 100:
+                    message = (
+                        f"Le budget {categorie} est dépassé ! "
+                        f"Vous avez utilisé {pourcentage:.1f} % "
+                        "de votre budget mensuel."
+                    )
+
+                elif pourcentage >= 100:
+                    message = (
+                        f"Le budget {categorie} a atteint "
+                        "100 % de sa limite mensuelle."
+                    )
+
+                else:
+                    message = (
+                        f"Le budget {categorie} est utilisé à "
+                        f"{pourcentage:.1f} %. "
+                        "Il reste peu de marge avant le dépassement."
+                    )
+
+            # ORANGE : attention
+            elif pourcentage >= 80:
+                niveau = "attention"
+
                 message = (
                     f"Le budget {categorie} est utilisé à "
-                    f"{pourcentage} %."
+                    f"{pourcentage:.1f} %. "
+                    "Il approche de sa limite mensuelle."
+                )
+
+            # VERT : informations
+            elif pourcentage >= 50:
+                niveau = "information"
+
+                message = (
+                    f"Le budget {categorie} est utilisé à "
+                    f"{pourcentage:.1f} %. "
+                    "Plus de la moitié du budget est consommée."
+                )
+
+            # GRIS : normal
+            else:
+                niveau = "normal"
+
+                message = (
+                    f"Le budget {categorie} est utilisé à "
+                    f"{pourcentage:.1f} %. "
+                    "La consommation est normale."
                 )
 
             alertes.append({
                 "id": budget["id"],
-                "titre": titre,
-                "message": message,
+                "titre": f"Budget {categorie}",
                 "categorie": categorie,
                 "type": niveau,
+                "message": message,
+                "pourcentage": pourcentage,
                 "statut": "active"
             })
 
         return alertes
+
+
 
     def afficher_alertes(self):
         """Afficher la page des alertes."""
@@ -690,10 +744,14 @@ class ApplicationMonBudget(ctk.CTk):
 
             alerte = None
 
-            if progression >= 1:
-                alerte = "depasse"
-            elif progression >= 0.8:
+            if progression >= 0.90:
+                alerte = "risque"
+            elif progression >= 0.80:
                 alerte = "attention"
+            elif progression >= 0.50:
+                alerte = "information"
+            else:
+                alerte = "normal"
 
             resultat.append({
                 "id": budget["id"],
@@ -732,6 +790,53 @@ class ApplicationMonBudget(ctk.CTk):
         }
 
         self.vue.actualiser(budgets, resume)
+
+
+
+    # ---------------------------------------
+    # FACTURES TEMPORAIRES
+    # ---------------------------------------
+
+    def afficher_factures(self):
+        """Afficher la page des factures."""
+
+        self.vue = VueFactures(
+            self.contenu,
+            on_ajouter=self.ajouter_facture,
+            on_supprimer=self.supprimer_facture
+        )
+
+        self.vue.pack(fill="both", expand=True)
+        self.actualiser_factures()
+
+    def ajouter_facture(self, donnees):
+        """Ajouter une facture en mémoire."""
+
+        facture = dict(donnees)
+        facture["id"] = str(uuid4())
+
+        self.factures.append(facture)
+        self.actualiser_factures()
+
+    def supprimer_facture(self, identifiant):
+        """Retirer une facture de la liste."""
+
+        self.factures = [
+            facture for facture in self.factures
+            if facture["id"] != identifiant
+        ]
+
+        self.actualiser_factures()
+
+    def actualiser_factures(self):
+        """Transmettre les factures à leur interface."""
+
+        if self.page_actuelle != "factures":
+            return
+
+        self.vue.actualiser(self.factures)
+
+
 
     # ---------------------------------------
     # PARAMÈTRES
@@ -779,6 +884,7 @@ class ApplicationMonBudget(ctk.CTk):
 
         self.transactions.clear()
         self.budgets.clear()
+        self.factures.clear()
         self.profil.clear()
 
         self.theme = "Clair"

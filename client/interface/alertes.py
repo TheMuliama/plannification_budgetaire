@@ -5,11 +5,38 @@ import customtkinter as ctk
 
 
 class VueAlertes(ctk.CTkFrame):
-    """Présenter les alertes budgétaires.
+    """Présenter les états et alertes budgétaires.
 
     Cette classe ne calcule pas les seuils budgétaires
     et ne modifie pas les données financières.
     """
+
+    NIVEAUX = {
+        "normal": {
+            "nom": "Normal",
+            "couleur": "#89949C",
+            "fond": "#F0F2F4",
+            "symbole": "✓"
+        },
+        "information": {
+            "nom": "Informations",
+            "couleur": "#16A34A",
+            "fond": "#E5F5EA",
+            "symbole": "i"
+        },
+        "attention": {
+            "nom": "Attention",
+            "couleur": "#D99520",
+            "fond": "#FFF2DA",
+            "symbole": "!"
+        },
+        "risque": {
+            "nom": "Risques et dépassement",
+            "couleur": "#C94C4C",
+            "fond": "#FCE8E8",
+            "symbole": "!"
+        }
+    }
 
     def __init__(self, master, on_retour=None):
         super().__init__(master, fg_color="#F5F3EF")
@@ -21,13 +48,11 @@ class VueAlertes(ctk.CTkFrame):
         self.blanc = "#FFFFFF"
         self.texte = "#172326"
         self.gris = "#777777"
-        self.orange = "#D99520"
-        self.rouge = "#C94C4C"
 
         self._construire_interface()
 
     def _construire_interface(self):
-        """Construire l'écran des alertes."""
+        """Construire l'interface des alertes."""
 
         entete = ctk.CTkFrame(
             self,
@@ -54,7 +79,7 @@ class VueAlertes(ctk.CTkFrame):
             command=self.retour_dashboard
         ).pack(side="right")
 
-        # Résumé des alertes
+        # Cartes de résumé
         resume = ctk.CTkFrame(
             self,
             fg_color="transparent"
@@ -66,18 +91,21 @@ class VueAlertes(ctk.CTkFrame):
         )
 
         self.total_actives = self._creer_carte(
-            resume, "Alertes actives"
+            resume,
+            "Alertes actives"
         )
 
         self.total_attention = self._creer_carte(
-            resume, "Budgets à surveiller"
+            resume,
+            "Budgets à surveiller"
         )
 
-        self.total_depassees = self._creer_carte(
-            resume, "Budgets dépassés"
+        self.total_risques = self._creer_carte(
+            resume,
+            "Risques et dépassements"
         )
 
-        # Filtres
+        # Zone des filtres
         zone_filtres = ctk.CTkFrame(
             self,
             fg_color=self.blanc,
@@ -103,19 +131,31 @@ class VueAlertes(ctk.CTkFrame):
             zone_filtres,
             values=[
                 "Toutes",
-                "Actives",
-                "Résolues",
+                "Normal",
+                "Informations",
                 "Attention",
-                "Dépassement"
+                "Risques et dépassement"
             ],
+            width=220,
             fg_color=self.vert,
             button_color="#004D3E",
-            command=lambda valeur: self._afficher_alertes()
+            command=self._changer_filtre
         )
-        self.filtre.pack(side="left")
-        self.filtre.set("Actives")
+        self.filtre.pack(side="left", pady=12)
+        self.filtre.set("Toutes")
 
-        # Liste des alertes
+        # Compteur des résultats filtrés
+        self.label_resultats = ctk.CTkLabel(
+            zone_filtres,
+            text="0 budget",
+            text_color=self.gris
+        )
+        self.label_resultats.pack(
+            side="right",
+            padx=20
+        )
+
+        # Liste défilante
         self.liste_alertes = ctk.CTkScrollableFrame(
             self,
             fg_color="transparent"
@@ -172,99 +212,117 @@ class VueAlertes(ctk.CTkFrame):
         return valeur
 
     def actualiser(self, alertes):
-        """Recevoir et afficher les alertes."""
+        """Recevoir les états budgétaires à afficher.
+
+        Chaque élément contient notamment :
+            id, titre, message, categorie,
+            type, pourcentage, statut.
+        """
 
         self.alertes = list(alertes)
 
-        actives = [
-            a for a in self.alertes
-            if a.get("statut", "active") == "active"
-        ]
-
-        attention = [
-            a for a in actives
+        attention = sum(
+            1 for a in self.alertes
             if a.get("type") == "attention"
-        ]
+        )
 
-        depassees = [
-            a for a in actives
-            if a.get("type") == "depasse"
-        ]
+        risques = sum(
+            1 for a in self.alertes
+            if a.get("type") == "risque"
+        )
 
         self.total_actives.configure(
-            text=str(len(actives))
+            text=str(attention + risques)
         )
 
         self.total_attention.configure(
-            text=str(len(attention))
+            text=str(attention)
         )
 
-        self.total_depassees.configure(
-            text=str(len(depassees))
+        self.total_risques.configure(
+            text=str(risques)
         )
 
         self._afficher_alertes()
 
+    def _changer_filtre(self, valeur):
+        """Réafficher la liste après sélection."""
+
+        self._afficher_alertes()
+
     def _afficher_alertes(self):
-        """Afficher les alertes selon le filtre."""
+        """Filtrer et afficher les budgets."""
 
         for widget in self.liste_alertes.winfo_children():
             widget.destroy()
 
         filtre = self.filtre.get()
-        resultat = []
 
-        for alerte in self.alertes:
-            statut = alerte.get("statut", "active")
-            type_alerte = alerte.get("type", "")
+        filtres = {
+            "Toutes": None,
+            "Normal": "normal",
+            "Informations": "information",
+            "Attention": "attention",
+            "Risques et dépassement": "risque"
+        }
 
-            if filtre == "Actives" and statut != "active":
-                continue
+        niveau_selectionne = filtres.get(filtre)
 
-            if filtre == "Résolues" and statut != "resolue":
-                continue
+        resultat = [
+            alerte
+            for alerte in self.alertes
+            if (
+                niveau_selectionne is None
+                or alerte.get("type") == niveau_selectionne
+            )
+        ]
 
-            if filtre == "Attention" and (
-                statut != "active"
-                or type_alerte != "attention"
-            ):
-                continue
+        nombre = len(resultat)
 
-            if filtre == "Dépassement" and (
-                statut != "active"
-                or type_alerte != "depasse"
-            ):
-                continue
-
-            resultat.append(alerte)
+        self.label_resultats.configure(
+            text=(
+                f"{nombre} budget"
+                if nombre == 1
+                else f"{nombre} budgets"
+            )
+        )
 
         if not resultat:
             ctk.CTkLabel(
                 self.liste_alertes,
-                text="Aucune alerte à afficher.",
+                text="Aucun budget à afficher.",
                 font=("Arial", 14),
                 text_color=self.gris
             ).pack(pady=60)
             return
 
+        ordre = {
+            "risque": 0,
+            "attention": 1,
+            "information": 2,
+            "normal": 3
+        }
+
+        resultat.sort(
+            key=lambda a: (
+                ordre.get(a.get("type"), 4),
+                -float(a.get("pourcentage", 0))
+            )
+        )
+
         for alerte in resultat:
             self._creer_alerte(alerte)
 
     def _creer_alerte(self, alerte):
-        """Créer une carte pour une alerte."""
+        """Créer une carte pour un état budgétaire."""
 
-        type_alerte = alerte.get("type", "attention")
-        statut = alerte.get("statut", "active")
+        niveau = alerte.get("type", "normal")
+        style = self.NIVEAUX.get(
+            niveau,
+            self.NIVEAUX["normal"]
+        )
 
-        if statut == "resolue":
-            couleur = self.gris
-            fond = "#F2F2F2"
-        elif type_alerte == "depasse":
-            couleur = self.rouge
-            fond = "#FCE8E8"
-        else:
-            couleur = self.orange
-            fond = "#FFF2DA"
+        couleur = style["couleur"]
 
         carte = ctk.CTkFrame(
             self.liste_alertes,
@@ -285,18 +343,20 @@ class VueAlertes(ctk.CTkFrame):
             pady=15
         )
 
-        symbole = "!" if statut == "active" else "✓"
-
+        # Icône colorée
         ctk.CTkLabel(
             contenu,
-            text=symbole,
-            width=40,
-            height=40,
+            text=style["symbole"],
+            width=42,
+            height=42,
             corner_radius=8,
-            fg_color=fond,
+            fg_color=style["fond"],
             text_color=couleur,
             font=("Arial", 20, "bold")
-        ).pack(side="left", padx=(0, 15))
+        ).pack(
+            side="left",
+            padx=(0, 15)
+        )
 
         informations = ctk.CTkFrame(
             contenu,
@@ -310,7 +370,7 @@ class VueAlertes(ctk.CTkFrame):
 
         ctk.CTkLabel(
             informations,
-            text=alerte.get("titre", "Alerte"),
+            text=alerte.get("titre", "Budget"),
             font=("Arial", 15, "bold"),
             text_color=self.texte,
             anchor="w"
@@ -323,28 +383,81 @@ class VueAlertes(ctk.CTkFrame):
             text_color=self.gris,
             anchor="w",
             justify="left",
-            wraplength=450
-        ).pack(fill="x", pady=(5, 0))
+            wraplength=500
+        ).pack(
+            fill="x",
+            pady=(5, 8)
+        )
+
+        # Pourcentage et barre de progression
+        pourcentage = float(
+            alerte.get("pourcentage", 0)
+        )
+
+        ligne = ctk.CTkFrame(
+            informations,
+            fg_color="transparent"
+        )
+        ligne.pack(fill="x")
+
+        ctk.CTkLabel(
+            ligne,
+            text=style["nom"],
+            font=("Arial", 12, "bold"),
+            text_color=couleur
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            ligne,
+            text=f"{pourcentage:.1f} %",
+            font=("Arial", 12, "bold"),
+            text_color=couleur
+        ).pack(side="right")
+
+        progression = ctk.CTkProgressBar(
+            informations,
+            height=8,
+            corner_radius=5,
+            fg_color="#E5E7EB",
+            progress_color=couleur
+        )
+        progression.pack(
+            fill="x",
+            pady=(6, 0)
+        )
+
+        progression.set(
+            max(0, min(pourcentage / 100, 1))
+        )
 
         ctk.CTkButton(
             contenu,
             text="Détails",
-            width=80,
+            width=85,
             fg_color=self.vert,
             hover_color="#004D3E",
             command=lambda a=alerte: self.afficher_details(a)
-        ).pack(side="right", padx=5)
+        ).pack(
+            side="right",
+            padx=(20, 0)
+        )
 
     def afficher_details(self, alerte):
-        """Afficher les détails d'une alerte."""
+        """Afficher les informations d'un budget."""
 
         fenetre = ctk.CTkToplevel(self)
-        fenetre.title("Détails de l'alerte")
-        fenetre.geometry("450x360")
+        fenetre.title("Détails du budget")
+        fenetre.geometry("470x390")
         fenetre.configure(fg_color="#F5F3EF")
         fenetre.resizable(False, False)
         fenetre.transient(self.winfo_toplevel())
         fenetre.grab_set()
+
+        niveau = alerte.get("type", "normal")
+        style = self.NIVEAUX.get(
+            niveau,
+            self.NIVEAUX["normal"]
+        )
 
         carte = ctk.CTkFrame(
             fenetre,
@@ -360,39 +473,45 @@ class VueAlertes(ctk.CTkFrame):
 
         ctk.CTkLabel(
             carte,
-            text=alerte.get("titre", "Alerte"),
+            text=alerte.get("titre", "Budget"),
             font=("Arial", 20, "bold"),
             text_color=self.texte,
-            wraplength=360
+            wraplength=390
         ).pack(pady=(25, 15))
+
+        ctk.CTkLabel(
+            carte,
+            text=style["nom"],
+            font=("Arial", 14, "bold"),
+            text_color=style["couleur"]
+        ).pack(pady=5)
 
         ctk.CTkLabel(
             carte,
             text=alerte.get("message", ""),
             font=("Arial", 13),
             text_color=self.texte,
-            wraplength=360,
+            wraplength=390,
             justify="center"
         ).pack(padx=20, pady=10)
-
-        categorie = alerte.get("categorie", "")
-        if categorie:
-            ctk.CTkLabel(
-                carte,
-                text=f"Catégorie : {categorie}",
-                text_color=self.gris
-            ).pack(pady=5)
-
-        statut = alerte.get("statut", "active")
 
         ctk.CTkLabel(
             carte,
             text=(
-                "Statut : Résolue"
-                if statut == "resolue"
-                else "Statut : Active"
+                "Catégorie : "
+                + str(alerte.get("categorie", ""))
             ),
             text_color=self.gris
+        ).pack(pady=5)
+
+        ctk.CTkLabel(
+            carte,
+            text=(
+                f"Budget consommé : "
+                f"{float(alerte.get('pourcentage', 0)):.1f} %"
+            ),
+            text_color=self.texte,
+            font=("Arial", 14, "bold")
         ).pack(pady=5)
 
         ctk.CTkButton(
@@ -411,5 +530,4 @@ class VueAlertes(ctk.CTkFrame):
     def vider(self):
         """Réinitialiser l'affichage."""
 
-        self.alertes = []
         self.actualiser([])

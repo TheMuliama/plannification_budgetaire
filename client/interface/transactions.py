@@ -6,6 +6,18 @@ from decimal import Decimal, InvalidOperation
 from tkinter import messagebox
 
 import customtkinter as ctk
+from tkcalendar import Calendar
+
+
+def centrer_fenetre(fenetre, parent, largeur, hauteur):
+    """Centrer une fenêtre par rapport à son parent."""
+
+    parent.update_idletasks()
+
+    x = parent.winfo_rootx() + (parent.winfo_width() - largeur) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - hauteur) // 2
+
+    fenetre.geometry(f"{largeur}x{hauteur}+{max(0, x)}+{max(0, y)}")
 
 
 class VueTransactions(ctk.CTkFrame):
@@ -458,7 +470,9 @@ class VueTransactions(ctk.CTkFrame):
             if modification
             else "Ajouter une transaction"
         )
-        fenetre.geometry("450x560")
+        #fenetre.geometry("450x540")
+        
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 560)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
@@ -531,14 +545,75 @@ class VueTransactions(ctk.CTkFrame):
         )
         champ_categorie.pack(pady=(5, 12))
 
-        # Date
+        # Date : saisie manuelle ou sélection dans un calendrier
+        zone_date = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
+        zone_date.pack(pady=8)
+
         champ_date = ctk.CTkEntry(
-            fenetre,
-            width=340,
+            zone_date,
+            width=290,
             height=40,
             placeholder_text="Date (JJ/MM/AAAA)"
         )
-        champ_date.pack(pady=8)
+        champ_date.pack(side="left")
+
+        def ouvrir_calendrier():
+            """Afficher un calendrier pour le champ date du formulaire."""
+            calendrier_fenetre = ctk.CTkToplevel(fenetre)
+            calendrier_fenetre.title("Choisir une date")
+            calendrier_fenetre.resizable(False, False)
+            calendrier_fenetre.transient(fenetre)
+            centrer_fenetre(calendrier_fenetre, fenetre, 240, 210)
+
+            try:
+                date_initiale = datetime.strptime(
+                    champ_date.get().strip(), "%d/%m/%Y"
+                )
+            except ValueError:
+                date_initiale = datetime.now()
+
+            calendrier = Calendar(
+                calendrier_fenetre,
+                selectmode="day",
+                year=date_initiale.year,
+                month=date_initiale.month,
+                day=date_initiale.day,
+                date_pattern="dd/mm/yyyy",
+                locale="fr_FR",
+                background="#00634F",
+                foreground="white",
+                selectbackground="#00634F",
+                selectforeground="white",
+                headersbackground="#E8F2EE",
+                headersforeground="#172326"
+            )
+            calendrier.pack(padx=16, pady=(16, 10))
+
+            def choisir_date():
+                champ_date.delete(0, "end")
+                champ_date.insert(0, calendrier.get_date())
+                calendrier_fenetre.destroy()
+
+            ctk.CTkButton(
+                calendrier_fenetre,
+                text="Choisir cette date",
+                fg_color=self.vert,
+                hover_color=self.vert_fonce,
+                command=choisir_date
+            ).pack(fill="x", padx=16, pady=(0, 16))
+
+            calendrier_fenetre.after(100, calendrier_fenetre.lift)
+
+        ctk.CTkButton(
+            zone_date,
+            text="📅",
+            width=40,
+            height=40,
+            fg_color="#E8F2EE",
+            text_color="#00634F",
+            hover_color="#D6E9E1",
+            command=ouvrir_calendrier
+        ).pack(side="left", padx=(10, 0))
 
         # Préremplissage lors d'une modification
         if modification:
@@ -705,4 +780,6 @@ class VueTransactions(ctk.CTkFrame):
                 "solde": 0
             }
         )
+
+
 

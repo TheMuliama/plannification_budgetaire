@@ -24,7 +24,6 @@ class VueParametres(ctk.CTkFrame):
         # Fonctions de rappel
         self.on_modifier_profil = on_modifier_profil
         self.on_changer_mot_de_passe = on_changer_mot_de_passe
-        self.on_changer_theme = on_changer_theme
         self.on_deconnexion = on_deconnexion
 
         # Couleurs
@@ -38,7 +37,6 @@ class VueParametres(ctk.CTkFrame):
 
         # Informations affichées
         self.profil = {}
-        self.theme = "Clair"
 
         self._construire_interface()
 
@@ -70,7 +68,7 @@ class VueParametres(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.conteneur,
-            text="Gérez votre profil et vos préférences.",
+            text="Gérez vos informations personnelles et la sécurité de votre compte.",
             font=("Arial", 13),
             text_color=self.gris
         ).pack(
@@ -79,7 +77,6 @@ class VueParametres(ctk.CTkFrame):
         )
 
         self._creer_section_profil()
-        self._creer_section_apparence()
         self._creer_section_securite()
         self._creer_section_compte()
 
@@ -184,53 +181,6 @@ class VueParametres(ctk.CTkFrame):
             pady=(5, 20)
         )
 
-    def _creer_section_apparence(self):
-        """Construire les préférences d'apparence."""
-
-        carte = self._creer_carte(
-            "Apparence"
-        )
-
-        ctk.CTkLabel(
-            carte,
-            text="Thème de l'application",
-            font=("Arial", 12),
-            text_color=self.texte
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(5, 5)
-        )
-
-        self.menu_theme = ctk.CTkOptionMenu(
-            carte,
-            values=[
-                "Clair",
-                "Sombre",
-                "Système"
-            ],
-            fg_color=self.vert,
-            button_color=self.vert_fonce,
-            command=self.changer_theme
-        )
-        self.menu_theme.pack(
-            anchor="w",
-            padx=20,
-            pady=(0, 20)
-        )
-        self.menu_theme.set(self.theme)
-
-        self.message_theme = ctk.CTkLabel(
-            carte,
-            text="",
-            text_color=self.gris
-        )
-        self.message_theme.pack(
-            anchor="w",
-            padx=20,
-            pady=(0, 15)
-        )
-
     def _creer_section_securite(self):
         """Construire la section de sécurité."""
 
@@ -331,7 +281,6 @@ class VueParametres(ctk.CTkFrame):
         """
 
         self.profil = dict(profil)
-        self.theme = theme
 
         champs = [
             (self.champ_nom, "nom"),
@@ -346,11 +295,7 @@ class VueParametres(ctk.CTkFrame):
                 str(self.profil.get(cle, ""))
             )
 
-        if theme in ["Clair", "Sombre", "Système"]:
-            self.menu_theme.set(theme)
-
         self.message_profil.configure(text="")
-        self.message_theme.configure(text="")
         self.message_securite.configure(text="")
 
     def enregistrer_profil(self):
@@ -396,23 +341,6 @@ class VueParametres(ctk.CTkFrame):
 
         self.message_profil.configure(
             text="Demande de modification transmise.",
-            text_color=self.vert
-        )
-
-    def changer_theme(self, valeur):
-        """Transmettre le thème sélectionné."""
-
-        if self.on_changer_theme is None:
-            self.message_theme.configure(
-                text="Changement de thème non configuré.",
-                text_color=self.rouge
-            )
-            return
-
-        self.on_changer_theme(valeur)
-
-        self.message_theme.configure(
-            text="Préférence transmise.",
             text_color=self.vert
         )
 
@@ -510,8 +438,7 @@ class VueParametres(ctk.CTkFrame):
 
         messages = {
             "profil": self.message_profil,
-            "securite": self.message_securite,
-            "theme": self.message_theme
+            "securite": self.message_securite
         }
 
         if section in messages:

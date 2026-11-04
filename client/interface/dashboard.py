@@ -147,28 +147,273 @@ class TableauDeBord(ctk.CTkFrame):
         self._texte(conteneur, message, 11, self.SECONDAIRE, wraplength=180).pack(
             anchor="center", expand=True, pady=35, padx=8)
 
-    def _dessiner_graphique(self, conteneur, valeurs, etiquettes, type_graphique):
-        fig = Figure(figsize=(3.1, 2.1), dpi=90, facecolor=self.BLANC)
+    def _dessiner_graphique(
+        self, conteneur, valeurs, etiquettes, type_graphique
+    ):
+        """Dessiner les graphiques du tableau de bord."""
+
+        from matplotlib.patches import FancyBboxPatch
+        from matplotlib import colors as mcolors
+
+        fig = Figure(
+            figsize=(3.8, 2.6),
+            dpi=100,
+            facecolor=self.BLANC
+        )
+
         axe = fig.add_subplot(111)
+        axe.set_facecolor(self.BLANC)
+
         if type_graphique == "camembert":
-            axe.pie(valeurs, colors=self.COULEURS[:len(valeurs)], startangle=90,
-                    wedgeprops={"width": 0.45})
-            axe.legend(etiquettes, loc="center left", bbox_to_anchor=(0.85, 0.5),
-                       fontsize=7, frameon=False)
+            total = sum(valeurs)
+
+            couleurs = [
+                self.COULEURS[i % len(self.COULEURS)]
+                for i in range(len(valeurs))
+            ]
+
+            # Diagramme en anneau
+            axe.pie(
+                valeurs,
+                colors=couleurs,
+                startangle=90,
+                counterclock=False,
+                radius=0.88,
+                wedgeprops={
+                    "width": 0.28,
+                    "edgecolor": self.BLANC,
+                    "linewidth": 2
+                }
+            )
+
+            # Légende avec pourcentages
+            legendes = []
+
+            for categorie, montant in zip(
+                etiquettes, valeurs
+            ):
+                pourcentage = (
+                    montant / total * 100
+                    if total > 0 else 0
+                )
+
+                legendes.append(
+                    f"{categorie} : {pourcentage:.1f} %"
+                    .replace(".", ",")
+                )
+
+            axe.legend(
+                legendes,
+                loc="center left",
+                bbox_to_anchor=(0.90, 0.5),
+                fontsize=8,
+                frameon=False,
+                labelspacing=1.2,
+                handlelength=1
+            )
+
+            axe.set_aspect("equal")
+            fig.subplots_adjust(
+                left=0.02,
+                right=0.72,
+                top=0.98,
+                bottom=0.02
+            )
+
         else:
-            axe.bar(range(len(valeurs)), valeurs, color="#B9D1C9", width=0.7)
-            axe.set_xticks(range(len(etiquettes)), etiquettes, fontsize=8)
-            axe.spines[["top", "right", "left"]].set_visible(False)
-            axe.tick_params(axis="y", left=False, labelleft=False)
-            axe.tick_params(axis="x", bottom=False)
-            for i, v in enumerate(valeurs):
-                axe.text(i, v, self._euros(v).replace(" €", ""), ha="center", va="bottom", fontsize=7)
-            axe.set_ylim(0, max(valeurs) * 1.25 if max(valeurs) else 1)
-        fig.tight_layout()
-        canvas = FigureCanvasTkAgg(fig, master=conteneur)
+            # Évolution des dépenses sur six mois
+            maximum = max(valeurs) if valeurs else 0
+            hauteur_max = maximum * 1.30 if maximum > 0 else 1
+
+            axe.set_xlim(-0.6, len(valeurs) - 0.4)
+            axe.set_ylim(0, hauteur_max)
+
+            for i, montant in enumerate(valeurs):
+                couleur = (
+                    self.VERT
+                    if i == len(valeurs) - 1
+                    else "#B9D1C9"
+                )
+
+                if montant > 0:
+                    largeur = 0.58
+
+                    barre = FancyBboxPatch(
+                        (i - largeur / 2, 0),
+                        largeur,
+                        montant,
+                        boxstyle="round,pad=0,rounding_size=0.08",
+                        facecolor=couleur,
+                        edgecolor="none",
+                        mutation_aspect=1
+                    )
+
+                    axe.add_patch(barre)
+
+                # Montant au-dessus de la barre
+                axe.text(
+                    i,
+                    montant + hauteur_max * 0.035,
+                    self._euros(montant),
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                    color=self.TEXTE,
+                    fontweight="bold" if i == len(valeurs) - 1 else "normal"
+                )
+
+            # Mois plus lisibles
+            noms_mois = [
+                "Jan", "Fév", "Mar", "Avr",
+                "Mai", "Juin", "Juil", "Août",
+                "Sep", "Oct", "Nov", "Déc"
+            ]
+
+            mois_affiches = []
+
+            for etiquette in etiquettes:
+                try:
+                    numero = int(str(etiquette).split("/")[0])
+                    mois_affiches.append(noms_mois[numero - 1])
+                except (ValueError, IndexError):
+                    mois_affiches.append(str(etiquette))
+
+            axe.set_xticks(
+                range(len(etiquettes)),
+                mois_affiches
+            )
+
+            axe.tick_params(
+                axis="x",
+                labelsize=8,
+                colors=self.SECONDAIRE,
+                length=0,
+                pad=8
+            )
+
+            axe.tick_params(
+                axis="y",
+                left=False,
+                labelleft=False
+            )
+
+            for bord in axe.spines.values():
+                bord.set_visible(False)
+
+            axe.axhline(
+                y=0,
+                color="#E5E7EB",
+                linewidth=1
+            )
+
+            fig.subplots_adjust(
+                left=0.06,
+                right=0.97,
+                top=0.91,
+                bottom=0.16
+            )
+
+        canvas = FigureCanvasTkAgg(
+            fig,
+            master=conteneur
+        )
+
         canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+        canvas.get_tk_widget().pack(
+            fill="both",
+            expand=True
+        )
+
         return canvas
+
+
+
+    def _creer_alerte_dashboard(self, alerte):
+        """Afficher une alerte urgente avec son niveau et son pourcentage."""
+
+        niveau = alerte.get("type", "")
+
+        if niveau == "risque":
+            couleur = "#B93838"
+            fond = "#FCE8E8"
+            symbole = "⚠"
+        elif niveau == "attention":
+            couleur = "#A96508"
+            fond = "#FFF2DA"
+            symbole = "⚠"
+        else:
+            return
+
+        categorie = str(alerte.get("categorie", "Budget"))
+        pourcentage = float(alerte.get("pourcentage", 0))
+
+        # Carte colorée occupant toute la largeur disponible
+        carte = ctk.CTkFrame(
+            self.zone_alertes,
+            fg_color=fond,
+            corner_radius=8
+        )
+        carte.pack(
+            fill="x",
+            pady=5
+        )
+
+        # Symbole d'alerte
+        ctk.CTkLabel(
+            carte,
+            text=symbole,
+            font=("Arial", 17, "bold"),
+            text_color=couleur,
+            width=25
+        ).pack(
+            side="left",
+            anchor="n",
+            padx=(10, 5),
+            pady=12
+        )
+
+        # Zone de texte
+        contenu = ctk.CTkFrame(
+            carte,
+            fg_color="transparent"
+        )
+        contenu.pack(
+            side="left",
+            fill="both",
+            expand=True,
+            padx=(0, 10),
+            pady=10
+        )
+
+        titre = ctk.CTkLabel(
+            contenu,
+            text=f"{categorie} — {pourcentage:.1f} %",
+            font=("Arial", 12, "bold"),
+            text_color=couleur,
+            anchor="w"
+        )
+        titre.pack(fill="x")
+
+        message = ctk.CTkLabel(
+            contenu,
+            text=alerte.get("message", ""),
+            font=("Arial", 11),
+            text_color=couleur,
+            justify="left",
+            anchor="w"
+        )
+        message.pack(fill="x", pady=(4, 0))
+
+        # Adapter le retour à la ligne à la largeur réelle
+        def ajuster_largeur(event):
+            message.configure(
+                wraplength=max(100, event.width - 5)
+            )
+
+        contenu.bind("<Configure>", ajuster_largeur)
+
+
 
     def actualiser(self, donnees: dict):
         """Actualiser l'interface avec des valeurs déjà préparées.
@@ -237,13 +482,38 @@ class TableauDeBord(ctk.CTkFrame):
             self._texte(ligne, depense.get("categorie", ""), 10, self.SECONDAIRE).pack(side="left", padx=8)
             self._texte(ligne, self._euros(depense.get("montant", 0)), 11, gras=True).pack(side="right")
 
+        # Afficher uniquement les alertes urgentes
         self._vider(self.zone_alertes)
-        alertes = self.donnees.get("alertes", [])
-        if not alertes:
-            self._etat_vide(self.zone_alertes, "Aucune alerte active")
-        for alerte in alertes[:4]:
-            self._texte(self.zone_alertes, "⚠ " + alerte.get("message", ""),
-                        11, "#9A650B", wraplength=210).pack(fill="x", pady=6)
+
+        alertes_urgentes = [
+            alerte
+            for alerte in self.donnees.get("alertes", [])
+            if alerte.get("type") in ("attention", "risque")
+        ]
+
+        # Mettre à jour le compteur
+        self.valeurs["alertes_actives"].configure(
+            text=str(len(alertes_urgentes))
+        )
+
+        if not alertes_urgentes:
+            self._etat_vide(
+                self.zone_alertes,
+                "Aucune alerte urgente pour le moment."
+            )
+        else:
+            # Afficher les risques en premier
+            alertes_urgentes.sort(
+                key=lambda a: (
+                    0 if a.get("type") == "risque" else 1,
+                    -float(a.get("pourcentage", 0))
+                )
+            )
+
+            for alerte in alertes_urgentes[:4]:
+                self._creer_alerte_dashboard(alerte)
+
+
 
     def _ouvrir_ajout(self):
         if callable(self.ajouter_depense):

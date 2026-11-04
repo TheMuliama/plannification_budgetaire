@@ -5,6 +5,17 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 
+def centrer_fenetre(fenetre, parent, largeur, hauteur):
+    """Centrer une fenêtre par rapport à son parent."""
+
+    parent.update_idletasks()
+
+    x = parent.winfo_rootx() + (parent.winfo_width() - largeur) // 2
+    y = parent.winfo_rooty() + (parent.winfo_height() - hauteur) // 2
+
+    fenetre.geometry(f"{largeur}x{hauteur}+{max(0, x)}+{max(0, y)}")
+
+
 class VueBudgets(ctk.CTkFrame):
     """Présenter la gestion des budgets.
 
@@ -388,7 +399,8 @@ class VueBudgets(ctk.CTkFrame):
             if modification
             else "Ajouter un budget"
         )
-        fenetre.geometry("430x400")
+
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 430, 400)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
