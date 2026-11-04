@@ -215,12 +215,10 @@ class VueInscription(ctk.CTkFrame):
 
         # Transmettre les données à la logique externe
         if self.on_register:
-            self.on_register(
-                nom,
-                prenom,
-                email,
-                password
-            )
+            try:
+                self.on_register(nom, prenom, email, password)
+            except (ConnectionError, OSError, ValueError) as erreur:
+                self.afficher_erreur(str(erreur))
         else:
             self.afficher_erreur(
                 "Service d'inscription non configuré."

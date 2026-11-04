@@ -45,6 +45,32 @@ Le client ne communique pas directement avec la base de données.
 
 Les services métier contiennent les responsabilités propres à l'application, tandis que les repositories assurent l'accès aux données.
 
+## Démarrage local
+
+Depuis la racine du dépôt :
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Démarrer le serveur dans un premier terminal :
+
+```bash
+python -m serveur.main
+```
+
+Puis démarrer l'application graphique dans un second terminal :
+
+```bash
+python client/main.py
+```
+
+Le serveur écoute par défaut sur `127.0.0.1:8765` et initialise la base
+`persistance/data/budget.db`. Les fichiers SQLite de ce dossier sont ignorés
+par Git afin de ne pas publier de données personnelles.
+
 ---
 
 ## Organisation des modules métier

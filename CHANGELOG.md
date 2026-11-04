@@ -7,6 +7,9 @@
 - Ajouter un serveur JSON/TCP, un routage vers les services et des sessions
   opaques empêchant le client de choisir l'identifiant d'un autre utilisateur.
 
+- Raccorder l'inscription, la connexion, les transactions et les budgets de
+  l'interface graphique au serveur et à SQLite.
+
 - Ajouter les calculs de consommation, les enveloppes hebdomadaires, les
   alertes par seuil et la simulation d'une dépense prévue.
 

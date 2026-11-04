@@ -137,7 +137,10 @@ class Connexion(ctk.CTkFrame):
 
         # La vérification sera faite par le serveur.
         if self.on_login:
-            self.on_login(email, password)
+            try:
+                self.on_login(email, password)
+            except (ConnectionError, OSError, ValueError) as erreur:
+                self.message.configure(text=str(erreur))
         else:
             self.message.configure(
                 text="Serveur d'authentification non configuré."

@@ -3,7 +3,6 @@
 
 from datetime import datetime
 from decimal import Decimal
-from uuid import uuid4
 
 import customtkinter as ctk
 
@@ -15,13 +14,13 @@ from interface.inscription import VueInscription
 from interface.parametres import VueParametres
 from interface.alertes import VueAlertes
 from interface.factures import VueFactures
+from communication.api import ApiClient
 
 
 class ApplicationMonBudget(ctk.CTk):
     """Coordonner les interfaces de MonBudget.
 
-    Les données sont temporaires et conservées en mémoire.
-    Aucun serveur ni aucune base de données n'est utilisé.
+    Les données du MVP sont chargées et modifiées par le serveur JSON/TCP.
     """
 
     def __init__(self):
@@ -46,6 +45,8 @@ class ApplicationMonBudget(ctk.CTk):
         self.factures = []
         self.profil = {}
         self.theme = "Clair"
+        self.api = ApiClient()
+        self.categories = []
 
         # État de l'interface
         self.page_actuelle = None
@@ -94,17 +95,10 @@ class ApplicationMonBudget(ctk.CTk):
         vue.pack(fill="both", expand=True)
 
     def demander_connexion(self, email, password):
-        """Simuler une session locale de démonstration.
-
-        Aucune vérification réelle du mot de passe.
-        """
-
-        self.profil = {
-            "nom": "",
-            "prenom": "",
-            "email": email
-        }
-
+        """Ouvrir une session authentifiée auprès du serveur."""
+        compte = self.api.connecter(email, password)
+        self.profil = {"nom":"","prenom":"","email":compte["identifiant"]}
+        self.charger_donnees()
         self.afficher_application()
 
     def demander_inscription(
@@ -114,15 +108,38 @@ class ApplicationMonBudget(ctk.CTk):
         email,
         password
     ):
-        """Simuler l'inscription pour tester les interfaces."""
-
-        self.profil = {
-            "nom": nom,
-            "prenom": prenom,
-            "email": email
-        }
-
+        """Créer le compte puis ouvrir sa session."""
+        self.api.inscrire(email,password)
+        compte=self.api.connecter(email,password)
+        self.profil={"nom":nom,"prenom":prenom,"email":compte["identifiant"]}
+        self.charger_donnees()
         self.afficher_application()
+
+    def charger_donnees(self):
+        """Recharger depuis SQLite les données utilisées par les écrans."""
+        self.categories=self.api.appeler("categories.lister")
+        noms={c["id"]:c["nom"] for c in self.categories}
+        budgets=self.api.appeler("budgets.lister")
+        self.budgets=[{"id":b["id"],"categorie":noms.get(b["categorie_id"],"Sans catégorie"),
+                       "categorie_id":b["categorie_id"],"plafond":Decimal(str(b["montant_alloue"]))}
+                      for b in budgets]
+        revenus=self.api.appeler("revenus.lister")
+        depenses=self.api.appeler("depenses.lister")
+        self.transactions=[{"id":f"revenu:{r['id']}","type":"Revenu",
+            "libelle":r.get("description") or "Revenu","montant":Decimal(str(r["montant"])),
+            "categorie":"Revenu","date":datetime.fromisoformat(r["date"]).strftime("%d/%m/%Y")}
+            for r in revenus]
+        self.transactions += [{"id":f"depense:{d['id']}","type":"Dépense",
+            "libelle":d.get("description") or "Dépense","montant":Decimal(str(d["montant"])),
+            "categorie":noms.get(d["categorie_id"],"Sans catégorie"),
+            "date":datetime.fromisoformat(d["date"]).strftime("%d/%m/%Y")}
+            for d in depenses]
+
+    def _categorie(self, nom):
+        for categorie in self.categories:
+            if categorie["nom"] == nom: return categorie
+        categorie=self.api.appeler("categories.creer",nom=nom)
+        self.categories.append(categorie); return categorie
 
     # ---------------------------------------
     # STRUCTURE PRINCIPALE
@@ -504,34 +521,40 @@ class ApplicationMonBudget(ctk.CTk):
     # ---------------------------------------
 
     def ajouter_transaction(self, donnees):
-        """Ajouter une transaction en mémoire."""
-
-        transaction = dict(donnees)
-        transaction["id"] = str(uuid4())
-
-        self.transactions.append(transaction)
+        """Ajouter une transaction persistée."""
+        date_iso=datetime.strptime(donnees["date"],"%d/%m/%Y").date().isoformat()
+        if donnees["type"] == "Revenu":
+            self.api.appeler("revenus.creer",montant=float(donnees["montant"]),date=date_iso,
+                             description=donnees["libelle"],statut="recu")
+        else:
+            categorie=self._categorie(donnees["categorie"])
+            budget=next((b for b in self.budgets if b["categorie_id"]==categorie["id"]),None)
+            if budget is None: raise ValueError("Créez d'abord un budget pour cette catégorie.")
+            self.api.appeler("depenses.creer",budget_id=budget["id"],categorie_id=categorie["id"],
+                montant=float(donnees["montant"]),date=date_iso,description=donnees["libelle"],statut="realisee")
+        self.charger_donnees()
         self.actualiser_transactions()
 
     def modifier_transaction(self, identifiant, donnees):
         """Modifier une transaction existante."""
 
-        for index, transaction in enumerate(self.transactions):
-            if transaction["id"] == identifiant:
-                nouvelle = dict(donnees)
-                nouvelle["id"] = identifiant
-                self.transactions[index] = nouvelle
-                break
-
+        type_objet,numero=identifiant.split(":",1); date_iso=datetime.strptime(donnees["date"],"%d/%m/%Y").date().isoformat()
+        if type_objet=="revenu":
+            self.api.appeler("revenus.modifier",id=int(numero),montant=float(donnees["montant"]),
+                             date=date_iso,description=donnees["libelle"],statut="recu")
+        else:
+            categorie=self._categorie(donnees["categorie"]); budget=next(b for b in self.budgets if b["categorie_id"]==categorie["id"])
+            self.api.appeler("depenses.modifier",id=int(numero),budget_id=budget["id"],categorie_id=categorie["id"],
+                             montant=float(donnees["montant"]),date=date_iso,description=donnees["libelle"],statut="realisee")
+        self.charger_donnees()
         self.actualiser_transactions()
 
     def supprimer_transaction(self, identifiant):
         """Supprimer une transaction en mémoire."""
 
-        self.transactions = [
-            t for t in self.transactions
-            if t["id"] != identifiant
-        ]
-
+        type_objet,numero=identifiant.split(":",1)
+        self.api.appeler(f"{'revenus' if type_objet=='revenu' else 'depenses'}.supprimer",id=int(numero))
+        self.charger_donnees()
         self.actualiser_transactions()
 
     def actualiser_transactions(self):
@@ -676,14 +699,11 @@ class ApplicationMonBudget(ctk.CTk):
     # ---------------------------------------
 
     def ajouter_budget(self, categorie, plafond):
-        """Ajouter un budget en mémoire."""
-
-        self.budgets.append({
-            "id": str(uuid4()),
-            "categorie": categorie,
-            "plafond": Decimal(str(plafond))
-        })
-
+        """Ajouter un budget mensuel persistant."""
+        classement=self._categorie(categorie); maintenant=datetime.now()
+        self.api.appeler("budgets.creer",annee=maintenant.year,mois=maintenant.month,
+                         categorie_id=classement["id"],montant_alloue=float(plafond),obligatoire=False)
+        self.charger_donnees()
         self.actualiser_budgets()
 
     def modifier_budget(
@@ -694,22 +714,16 @@ class ApplicationMonBudget(ctk.CTk):
     ):
         """Modifier un budget existant."""
 
-        for budget in self.budgets:
-            if budget["id"] == identifiant:
-                budget["categorie"] = categorie
-                budget["plafond"] = Decimal(str(plafond))
-                break
-
+        classement=self._categorie(categorie); maintenant=datetime.now()
+        self.api.appeler("budgets.modifier",id=int(identifiant),annee=maintenant.year,mois=maintenant.month,
+                         categorie_id=classement["id"],montant_alloue=float(plafond),obligatoire=False)
+        self.charger_donnees()
         self.actualiser_budgets()
 
     def supprimer_budget(self, identifiant):
         """Supprimer un budget en mémoire."""
 
-        self.budgets = [
-            b for b in self.budgets
-            if b["id"] != identifiant
-        ]
-
+        self.api.appeler("budgets.supprimer",id=int(identifiant)); self.charger_donnees()
         self.actualiser_budgets()
 
     def calculer_budgets_affichage(self):
@@ -880,7 +894,9 @@ class ApplicationMonBudget(ctk.CTk):
     # ---------------------------------------
 
     def deconnecter(self):
-        """Terminer la session locale."""
+        """Terminer la session serveur et vider l'affichage local."""
+
+        self.api.deconnecter()
 
         self.transactions.clear()
         self.budgets.clear()

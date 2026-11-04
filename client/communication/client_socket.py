@@ -15,6 +15,11 @@ class ClientSocket:
         self._socket: socket.socket | None = None
         self._lecture = None
 
+    @property
+    def est_connecte(self) -> bool:
+        """Indiquer si une connexion réseau est ouverte."""
+        return self._socket is not None
+
     def connecter(self, adresse: str, port: int) -> None:
         """Établir une connexion vers le serveur indiqué.
 

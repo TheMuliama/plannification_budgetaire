@@ -35,8 +35,11 @@ class ApplicationServeur:
         return {"utilisateurs.creer":self.creer_compte,"utilisateurs.connecter":self.connecter,
             "utilisateurs.deconnecter":self.deconnecter,"categories.creer":self.creer_categorie,
             "categories.lister":self.lister_categories,"revenus.creer":self.creer_revenu,
+            "revenus.modifier":self.modifier_revenu,"revenus.supprimer":self.supprimer_revenu,
             "revenus.lister":self.lister_revenus,"budgets.creer":self.creer_budget,
+            "budgets.modifier":self.modifier_budget,"budgets.supprimer":self.supprimer_budget,
             "budgets.lister":self.lister_budgets,"depenses.creer":self.creer_depense,
+            "depenses.modifier":self.modifier_depense,"depenses.supprimer":self.supprimer_depense,
             "depenses.lister":self.lister_depenses,"objectifs.creer":self.creer_objectif,
             "objectifs.lister":self.lister_objectifs}
 
@@ -57,10 +60,16 @@ class ApplicationServeur:
     def creer_categorie(self,d): return self.categories.creer_categorie(self._id(d),d["nom"])
     def lister_categories(self,d): return self.categories.recuperer_categories(self._id(d))
     def creer_revenu(self,d): return self.revenus.ajouter_revenu({**d,"utilisateur_id":self._id(d)})
+    def modifier_revenu(self,d): return self.revenus.modifier_revenu(self._id(d),d["id"],d)
+    def supprimer_revenu(self,d): self.revenus.supprimer_revenu(self._id(d),d["id"]); return None
     def lister_revenus(self,d): return self.revenus.consulter_revenus(self._id(d),d.get("debut"),d.get("fin"),d.get("statut"))
     def creer_budget(self,d): return self.budgets.creer_budget({**d,"utilisateur_id":self._id(d)})
+    def modifier_budget(self,d): return self.budgets.modifier_budget(self._id(d),d["id"],d)
+    def supprimer_budget(self,d): self.budgets.supprimer_budget(self._id(d),d["id"]); return None
     def lister_budgets(self,d): return self.budgets.consulter_budget(self._id(d),d.get("annee"),d.get("mois"))
     def creer_depense(self,d): return self.depenses.ajouter_depense({**d,"utilisateur_id":self._id(d)})
+    def modifier_depense(self,d): return self.depenses.modifier_depense(self._id(d),d["id"],d)
+    def supprimer_depense(self,d): self.depenses.supprimer_depense(self._id(d),d["id"]); return None
     def lister_depenses(self,d): return self.depenses.consulter_depenses(self._id(d),d.get("statut"))
     def creer_objectif(self,d): return self.objectifs.creer_objectif({**d,"utilisateur_id":self._id(d)})
     def lister_objectifs(self,d): return self.objectifs.consulter_objectifs(self._id(d))

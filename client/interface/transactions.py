@@ -720,10 +720,11 @@ class VueTransactions(ctk.CTkFrame):
                     )
                     return
 
-                self.on_modifier(
-                    transaction.get("id"),
-                    donnees
-                )
+                try:
+                    self.on_modifier(transaction.get("id"), donnees)
+                except (ConnectionError, OSError, ValueError, StopIteration) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             else:
                 if self.on_ajouter is None:
@@ -732,7 +733,11 @@ class VueTransactions(ctk.CTkFrame):
                     )
                     return
 
-                self.on_ajouter(donnees)
+                try:
+                    self.on_ajouter(donnees)
+                except (ConnectionError, OSError, ValueError) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             fenetre.destroy()
 

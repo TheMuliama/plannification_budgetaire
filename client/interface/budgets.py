@@ -504,11 +504,11 @@ class VueBudgets(ctk.CTkFrame):
                     )
                     return
 
-                self.on_modifier(
-                    budget.get("id"),
-                    categorie,
-                    plafond
-                )
+                try:
+                    self.on_modifier(budget.get("id"), categorie, plafond)
+                except (ConnectionError, OSError, ValueError) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             else:
                 if self.on_ajouter is None:
@@ -517,10 +517,11 @@ class VueBudgets(ctk.CTkFrame):
                     )
                     return
 
-                self.on_ajouter(
-                    categorie,
-                    plafond
-                )
+                try:
+                    self.on_ajouter(categorie, plafond)
+                except (ConnectionError, OSError, ValueError) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             fenetre.destroy()
 
