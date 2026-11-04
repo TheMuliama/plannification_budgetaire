@@ -8,7 +8,7 @@ from typing import Any
 class ClientSocket:
     """Définir la communication du client vers le serveur.
 
-    Cette classe ne développe pas les échanges réseau dans ce squelette.
+    Les messages sont des objets JSON UTF-8 séparés par un saut de ligne.
     """
 
     def __init__(self) -> None:

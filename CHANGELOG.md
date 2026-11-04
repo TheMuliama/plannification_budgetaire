@@ -10,6 +10,9 @@
 - Raccorder l'inscription, la connexion, les transactions et les budgets de
   l'interface graphique au serveur et à SQLite.
 
+- Ajouter à l'interface la création d'objectifs d'épargne et la simulation de
+  l'impact d'une dépense prévue sur le budget restant.
+
 - Ajouter les calculs de consommation, les enveloppes hebdomadaires, les
   alertes par seuil et la simulation d'une dépense prévue.
 

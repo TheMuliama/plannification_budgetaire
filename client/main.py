@@ -14,6 +14,7 @@ from interface.inscription import VueInscription
 from interface.parametres import VueParametres
 from interface.alertes import VueAlertes
 from interface.factures import VueFactures
+from interface.objectifs import VueObjectifs
 from communication.api import ApiClient
 
 
@@ -182,8 +183,8 @@ class ApplicationMonBudget(ctk.CTk):
             ("Tableau de bord", "dashboard"),
             ("Transactions", "transactions"),
             ("Budgets", "budgets"),
+            ("Épargne & projection", "objectifs"),
             ("Alertes", "alertes"),
-            ("Factures", "factures"),
             ("Paramètres", "parametres")
         ]
 
@@ -289,6 +290,9 @@ class ApplicationMonBudget(ctk.CTk):
 
         elif page == "budgets":
             self.afficher_budgets()
+
+        elif page == "objectifs":
+            self.afficher_objectifs()
 
         elif page == "factures":
             self.afficher_factures()
@@ -497,6 +501,23 @@ class ApplicationMonBudget(ctk.CTk):
 
         self.vue.pack(fill="both", expand=True)
         self.actualiser_budgets()
+
+    def afficher_objectifs(self):
+        """Afficher les objectifs d'épargne et le simulateur."""
+        self.vue=VueObjectifs(self.contenu,self.ajouter_objectif,self.simuler_depense)
+        self.vue.pack(fill="both",expand=True)
+        self.vue.actualiser(self.api.appeler("objectifs.lister"))
+
+    def ajouter_objectif(self, donnees):
+        """Créer un objectif puis rafraîchir sa liste."""
+        self.api.appeler("objectifs.creer",**donnees)
+        if self.page_actuelle=="objectifs":
+            self.vue.actualiser(self.api.appeler("objectifs.lister"))
+
+    def simuler_depense(self, montant):
+        """Projeter l'impact d'une dépense sans la persister."""
+        if montant <= 0: raise ValueError("Le montant doit être supérieur à zéro.")
+        return self.api.appeler("projection.simuler",montant=montant)
 
     def afficher_parametres(self):
         """Afficher les paramètres."""

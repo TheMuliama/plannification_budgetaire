@@ -9,7 +9,7 @@ from typing import Any
 class ServeurSocket:
     """Définir la communication du serveur avec les clients.
 
-    Cette classe ne développe pas les sockets dans ce squelette.
+    Les messages sont des objets JSON UTF-8 séparés par un saut de ligne.
     """
 
     def __init__(self, traitements: dict[str, Callable[[dict[str, Any]], Any]] | None=None) -> None:

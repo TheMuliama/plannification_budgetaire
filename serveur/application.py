@@ -17,6 +17,7 @@ from serveur.services.depenses import GestionnaireDepenses
 from serveur.services.objectifs_epargne import GestionnaireObjectifsEpargne
 from serveur.services.revenus import GestionnaireRevenus
 from serveur.services.utilisateurs import GestionnaireUtilisateurs
+from serveur.services.projection import MoteurProjection
 
 
 class ApplicationServeur:
@@ -29,6 +30,7 @@ class ApplicationServeur:
         self.budgets=GestionnaireBudget(RepositoryBudgets(connexion))
         self.depenses=GestionnaireDepenses(RepositoryDepenses(connexion))
         self.objectifs=GestionnaireObjectifsEpargne(RepositoryObjectifsEpargne(connexion))
+        self.projection=MoteurProjection()
         self._sessions: dict[str,int]={}
 
     def traitements(self) -> dict[str, Any]:
@@ -41,7 +43,7 @@ class ApplicationServeur:
             "budgets.lister":self.lister_budgets,"depenses.creer":self.creer_depense,
             "depenses.modifier":self.modifier_depense,"depenses.supprimer":self.supprimer_depense,
             "depenses.lister":self.lister_depenses,"objectifs.creer":self.creer_objectif,
-            "objectifs.lister":self.lister_objectifs}
+            "objectifs.lister":self.lister_objectifs,"projection.simuler":self.simuler_depense}
 
     def creer_compte(self, d: dict[str,Any]) -> dict[str,Any]:
         return self.utilisateurs.creer_compte(d["identifiant"],d["mot_de_passe"])
@@ -73,6 +75,18 @@ class ApplicationServeur:
     def lister_depenses(self,d): return self.depenses.consulter_depenses(self._id(d),d.get("statut"))
     def creer_objectif(self,d): return self.objectifs.creer_objectif({**d,"utilisateur_id":self._id(d)})
     def lister_objectifs(self,d): return self.objectifs.consulter_objectifs(self._id(d))
+    def simuler_depense(self,d):
+        utilisateur_id=self._id(d)
+        budgets=self.budgets.consulter_budget(utilisateur_id)
+        depenses=self.depenses.consulter_depenses(utilisateur_id,"realisee")
+        total_budget=sum(float(b["montant_alloue"]) for b in budgets)
+        total_depenses=sum(float(x["montant"]) for x in depenses)
+        objectifs=self.objectifs.consulter_objectifs(utilisateur_id)
+        objectif=objectifs[0] if objectifs else {"montant_periodique":0}
+        return self.projection.simuler_ajout_depense(
+            {"budget_restant":total_budget-total_depenses,
+             "budget_flexible":total_budget-total_depenses},
+            {"montant":float(d["montant"])},objectif)
 
 
 def construire_serveur(connexion: sqlite3.Connection) -> ServeurSocket:
