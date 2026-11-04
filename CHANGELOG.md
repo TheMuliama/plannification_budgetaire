@@ -4,6 +4,9 @@
 
 ### Added
 
+- Ajouter la gestion persistante des budgets mensuels, avec validation des
+  catégories et isolation des données de chaque utilisateur.
+
 - Ajouter la persistance des comptes utilisateurs, avec création, lecture et
   suppression contrôlées par SQLite
   ([#3](https://github.com/TheMuliama/plannification_budgetaire/issues/3)).
