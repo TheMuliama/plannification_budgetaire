@@ -21,7 +21,12 @@ class MoteurProjection:
         Returns:
             La situation future projetée.
         """
-        pass
+        total=round(sum(float(d.get("montant",0)) for d in depenses_prevues),2)
+        restant=round(float(etat_budget.get("budget_restant",0))-total,2)
+        flexible=round(float(etat_budget.get("budget_flexible",restant))-total,2)
+        capacite=max(0.0,round(float(objectif_epargne.get("montant_periodique",0))+min(0,flexible),2))
+        return {**etat_budget,"depenses_prevues":total,"budget_restant_projete":restant,
+                "budget_flexible_projete":flexible,"capacite_epargne_projetee":capacite}
 
     def simuler_ajout_depense(self, etat_budget: dict[str, Any], depense_prevue: dict[str, Any], objectif_epargne: dict[str, Any]) -> dict[str, Any]:
         """Simuler l'impact d'une dépense prévue ajoutée.
@@ -34,7 +39,7 @@ class MoteurProjection:
         Returns:
             La situation projetée après l'ajout.
         """
-        pass
+        return self.realiser_projection(etat_budget,[depense_prevue],objectif_epargne)
 
     def determiner_consequences(self, situation_projetee: dict[str, Any]) -> dict[str, Any]:
         """Déterminer les conséquences d'une situation projetée.
@@ -45,4 +50,8 @@ class MoteurProjection:
         Returns:
             Les conséquences sur les catégories, la flexibilité et l'épargne.
         """
-        pass
+        restant=float(situation_projetee.get("budget_restant_projete",0))
+        flexible=float(situation_projetee.get("budget_flexible_projete",0))
+        return {"budget_depasse":restant<0,"budget_flexible_depasse":flexible<0,
+                "impact_budget":round(-float(situation_projetee.get("depenses_prevues",0)),2),
+                "capacite_epargne":float(situation_projetee.get("capacite_epargne_projetee",0))}

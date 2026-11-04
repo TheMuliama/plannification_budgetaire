@@ -4,6 +4,9 @@
 
 ### Added
 
+- Ajouter les calculs de consommation, les enveloppes hebdomadaires, les
+  alertes par seuil et la simulation d'une dépense prévue.
+
 - Ajouter la gestion et le suivi des objectifs d'épargne, avec calcul d'un plan
   périodique et propositions de réajustement.
 
