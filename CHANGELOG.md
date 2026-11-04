@@ -4,6 +4,11 @@
 
 ### Added
 
+- Catégoriser les revenus (salaire, remboursement, cadeau, prime ou autre)
+  sans les rattacher aux budgets de dépenses, avec migration des bases existantes.
+
+- Ajouter un calendrier et un suivi visuel de progression aux objectifs d'épargne.
+
 - Ajouter un serveur JSON/TCP, un routage vers les services et des sessions
   opaques empêchant le client de choisir l'identifiant d'un autre utilisateur.
 
@@ -53,6 +58,11 @@
   ([#2](https://github.com/TheMuliama/plannification_budgetaire/issues/2)).
 
 ### Fixed
+
+- Harmoniser les couleurs et la présentation de l'écran Épargne et projection.
+
+- Limiter les budgets, alertes et projections au mois courant et empêcher la
+  conversion incohérente d'un revenu en dépense lors d'une modification.
 
 - Valider et normaliser les noms des catégories et sous-catégories, avec des
   tests respectant les clés étrangères du schéma SQLite

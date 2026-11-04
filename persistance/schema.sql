@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS revenus (
     date TEXT NOT NULL,
     description TEXT,
 
+    categorie TEXT NOT NULL DEFAULT 'Salaire',
+
     statut TEXT NOT NULL CHECK (
         statut IN ('prevu', 'recu')
     ),

@@ -89,9 +89,11 @@ def test_service_gerer_le_cycle_de_vie_d_un_revenu(
             "date": "2026-11-04",
             "description": "  Mission  ",
             "statut": "prevu",
+            "categorie": "Prime",
         }
     )
     assert revenu["description"] == "Mission"
+    assert revenu["categorie"] == "Prime"
 
     revenu_modifie = gestionnaire_revenus.modifier_revenu(
         1,
@@ -101,10 +103,12 @@ def test_service_gerer_le_cycle_de_vie_d_un_revenu(
             "date": "2026-11-05",
             "description": None,
             "statut": "recu",
+            "categorie": "Remboursement",
         },
     )
     assert revenu_modifie["montant"] == 275
     assert revenu_modifie["statut"] == "recu"
+    assert revenu_modifie["categorie"] == "Remboursement"
 
     gestionnaire_revenus.supprimer_revenu(1, revenu["id"])
     assert gestionnaire_revenus.consulter_revenus(1) == []
@@ -117,6 +121,7 @@ def test_service_gerer_le_cycle_de_vie_d_un_revenu(
         {"montant": float("nan")},
         {"date": "04/11/2026"},
         {"statut": "encaisse"},
+        {"categorie": "Budget courses"},
     ),
 )
 def test_service_refuser_un_revenu_invalide(

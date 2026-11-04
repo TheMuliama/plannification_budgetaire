@@ -122,13 +122,15 @@ class ApplicationMonBudget(ctk.CTk):
         noms={c["id"]:c["nom"] for c in self.categories}
         budgets=self.api.appeler("budgets.lister")
         self.budgets=[{"id":b["id"],"categorie":noms.get(b["categorie_id"],"Sans catégorie"),
-                       "categorie_id":b["categorie_id"],"plafond":Decimal(str(b["montant_alloue"]))}
+                       "categorie_id":b["categorie_id"],"annee":b["annee"],"mois":b["mois"],
+                       "plafond":Decimal(str(b["montant_alloue"]))}
                       for b in budgets]
         revenus=self.api.appeler("revenus.lister")
         depenses=self.api.appeler("depenses.lister")
         self.transactions=[{"id":f"revenu:{r['id']}","type":"Revenu",
             "libelle":r.get("description") or "Revenu","montant":Decimal(str(r["montant"])),
-            "categorie":"Revenu","date":datetime.fromisoformat(r["date"]).strftime("%d/%m/%Y")}
+            "categorie":r.get("categorie","Salaire"),
+            "date":datetime.fromisoformat(r["date"]).strftime("%d/%m/%Y")}
             for r in revenus]
         self.transactions += [{"id":f"depense:{d['id']}","type":"Dépense",
             "libelle":d.get("description") or "Dépense","montant":Decimal(str(d["montant"])),
@@ -544,14 +546,18 @@ class ApplicationMonBudget(ctk.CTk):
 
     def ajouter_transaction(self, donnees):
         """Ajouter une transaction persistée."""
-        date_iso=datetime.strptime(donnees["date"],"%d/%m/%Y").date().isoformat()
+        date_transaction=datetime.strptime(donnees["date"],"%d/%m/%Y")
+        date_iso=date_transaction.date().isoformat()
         if donnees["type"] == "Revenu":
             self.api.appeler("revenus.creer",montant=float(donnees["montant"]),date=date_iso,
-                             description=donnees["libelle"],statut="recu")
+                             description=donnees["libelle"],statut="recu",
+                             categorie=donnees["categorie"])
         else:
             categorie=self._categorie(donnees["categorie"])
-            budget=next((b for b in self.budgets if b["categorie_id"]==categorie["id"]),None)
-            if budget is None: raise ValueError("Créez d'abord un budget pour cette catégorie.")
+            budget=next((b for b in self.budgets if b["categorie_id"]==categorie["id"]
+                         and b["annee"]==date_transaction.year and b["mois"]==date_transaction.month),None)
+            if budget is None:
+                raise ValueError("Aucun budget pour cette catégorie au mois de la transaction.")
             self.api.appeler("depenses.creer",budget_id=budget["id"],categorie_id=categorie["id"],
                 montant=float(donnees["montant"]),date=date_iso,description=donnees["libelle"],statut="realisee")
         self.charger_donnees()
@@ -560,12 +566,19 @@ class ApplicationMonBudget(ctk.CTk):
     def modifier_transaction(self, identifiant, donnees):
         """Modifier une transaction existante."""
 
-        type_objet,numero=identifiant.split(":",1); date_iso=datetime.strptime(donnees["date"],"%d/%m/%Y").date().isoformat()
+        type_objet,numero=identifiant.split(":",1)
+        date_transaction=datetime.strptime(donnees["date"],"%d/%m/%Y")
+        date_iso=date_transaction.date().isoformat()
         if type_objet=="revenu":
             self.api.appeler("revenus.modifier",id=int(numero),montant=float(donnees["montant"]),
-                             date=date_iso,description=donnees["libelle"],statut="recu")
+                             date=date_iso,description=donnees["libelle"],statut="recu",
+                             categorie=donnees["categorie"])
         else:
-            categorie=self._categorie(donnees["categorie"]); budget=next(b for b in self.budgets if b["categorie_id"]==categorie["id"])
+            categorie=self._categorie(donnees["categorie"])
+            budget=next((b for b in self.budgets if b["categorie_id"]==categorie["id"]
+                         and b["annee"]==date_transaction.year and b["mois"]==date_transaction.month),None)
+            if budget is None:
+                raise ValueError("Aucun budget pour cette catégorie au mois de la transaction.")
             self.api.appeler("depenses.modifier",id=int(numero),budget_id=budget["id"],categorie_id=categorie["id"],
                              montant=float(donnees["montant"]),date=date_iso,description=donnees["libelle"],statut="realisee")
         self.charger_donnees()
@@ -609,9 +622,11 @@ class ApplicationMonBudget(ctk.CTk):
             "solde": revenus - depenses
         }
 
-        self.vue.definir_categories(
-            [b["categorie"] for b in self.budgets]
-        )
+        maintenant = datetime.now()
+        self.vue.definir_categories(sorted({
+            b["categorie"] for b in self.budgets
+            if b["annee"] == maintenant.year and b["mois"] == maintenant.month
+        }))
 
         self.vue.actualiser(
             self.transactions,
@@ -754,8 +769,11 @@ class ApplicationMonBudget(ctk.CTk):
         resultat = []
 
         mois_actuel = datetime.now().strftime("%m/%Y")
+        maintenant = datetime.now()
 
         for budget in self.budgets:
+            if budget["annee"] != maintenant.year or budget["mois"] != maintenant.month:
+                continue
             plafond = budget["plafond"]
 
             depense = sum(

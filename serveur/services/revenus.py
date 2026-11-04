@@ -14,6 +14,8 @@ class GestionnaireRevenus:
     calculs.
     """
 
+    CATEGORIES = {"Salaire", "Remboursement", "Cadeau", "Prime", "Autre"}
+
     def __init__(self, repository: RepositoryRevenus) -> None:
         self._repository = repository
 
@@ -60,6 +62,7 @@ class GestionnaireRevenus:
             donnees["date"],
             donnees["description"],
             donnees["statut"],
+            donnees["categorie"],
         )
         if not modifie:
             raise ValueError("Revenu introuvable pour cet utilisateur.")
@@ -140,12 +143,17 @@ class GestionnaireRevenus:
             if not isinstance(description, str):
                 raise ValueError("La description du revenu est invalide.")
             description = description.strip() or None
+        categorie = revenu.get("categorie", "Salaire")
+        if not isinstance(categorie, str) or categorie.strip() not in cls.CATEGORIES:
+            raise ValueError("La catégorie du revenu est invalide.")
+        categorie = categorie.strip()
         return {
             "utilisateur_id": utilisateur_id,
             "montant": montant,
             "date": date_revenu,
             "description": description,
             "statut": statut,
+            "categorie": categorie,
         }
 
     @staticmethod

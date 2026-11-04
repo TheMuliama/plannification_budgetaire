@@ -1,6 +1,7 @@
 """Accès à la base de données SQLite."""
 
 import sqlite3
+from pathlib import Path
 
 
 class Database:
@@ -34,3 +35,17 @@ class Database:
             None.
         """
         connexion.close()
+
+    def initialiser_schema(
+        self, connexion: sqlite3.Connection, chemin_schema: str = "persistance/schema.sql"
+    ) -> None:
+        """Créer le schéma et appliquer les migrations légères nécessaires."""
+        connexion.executescript(Path(chemin_schema).read_text(encoding="utf-8"))
+        colonnes_revenus = {
+            ligne[1] for ligne in connexion.execute("PRAGMA table_info(revenus)").fetchall()
+        }
+        if "categorie" not in colonnes_revenus:
+            with connexion:
+                connexion.execute(
+                    "ALTER TABLE revenus ADD COLUMN categorie TEXT NOT NULL DEFAULT 'Salaire'"
+                )

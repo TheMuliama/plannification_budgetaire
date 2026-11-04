@@ -19,8 +19,8 @@ def main() -> None:
     analyseur.add_argument("--port",type=int,default=8765)
     options=analyseur.parse_args()
     chemin=Path(options.base); chemin.parent.mkdir(parents=True,exist_ok=True)
-    connexion=Database().connecter(str(chemin))
-    connexion.executescript(Path("persistance/schema.sql").read_text(encoding="utf-8"))
+    base=Database(); connexion=base.connecter(str(chemin))
+    base.initialiser_schema(connexion)
     try: construire_serveur(connexion).demarrer(options.port,options.adresse)
     finally: connexion.close()
 

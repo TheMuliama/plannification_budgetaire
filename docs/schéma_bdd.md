@@ -38,6 +38,7 @@ erDiagram
         REAL montant
         TEXT date
         TEXT description
+        TEXT categorie
         TEXT statut
     }
 

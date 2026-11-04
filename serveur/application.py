@@ -2,6 +2,7 @@
 
 import secrets
 import sqlite3
+from datetime import date
 from typing import Any
 
 from persistance.repositories.budgets import RepositoryBudgets
@@ -87,8 +88,12 @@ class ApplicationServeur:
     def lister_objectifs(self,d): return self.objectifs.consulter_objectifs(self._id(d))
     def simuler_depense(self,d):
         utilisateur_id=self._id(d)
-        budgets=self.budgets.consulter_budget(utilisateur_id)
+        aujourd_hui=date.today()
+        budgets=self.budgets.consulter_budget(utilisateur_id,aujourd_hui.year,aujourd_hui.month)
         depenses=self.depenses.consulter_depenses(utilisateur_id,"realisee")
+        depenses=[depense for depense in depenses
+                  if date.fromisoformat(depense["date"]).year==aujourd_hui.year
+                  and date.fromisoformat(depense["date"]).month==aujourd_hui.month]
         total_budget=sum(float(b["montant_alloue"]) for b in budgets)
         total_depenses=sum(float(x["montant"]) for x in depenses)
         objectifs=self.objectifs.consulter_objectifs(utilisateur_id)

@@ -26,6 +26,8 @@ class VueTransactions(ctk.CTkFrame):
     Cette classe ne contient pas de logique de gestion financière.
     """
 
+    CATEGORIES_REVENUS = ["Salaire", "Remboursement", "Cadeau", "Prime", "Autre"]
+
     def __init__(
         self,
         master,
@@ -472,7 +474,7 @@ class VueTransactions(ctk.CTkFrame):
         )
         #fenetre.geometry("450x540")
         
-        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 560)
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 590)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
@@ -504,6 +506,10 @@ class VueTransactions(ctk.CTkFrame):
             button_color=self.vert_fonce
         )
         champ_type.pack(pady=(5, 12))
+        if modification:
+            # Une conversion revenu/dépense doit être une suppression puis un ajout :
+            # les deux objets ne reposent pas sur les mêmes données métier.
+            champ_type.configure(state="disabled")
 
         # Libellé
         champ_libelle = ctk.CTkEntry(
@@ -524,16 +530,17 @@ class VueTransactions(ctk.CTkFrame):
         champ_montant.pack(pady=8)
 
         # Catégorie
-        ctk.CTkLabel(
+        label_categorie = ctk.CTkLabel(
             fenetre,
             text="Catégorie",
             text_color=self.texte
-        ).pack(anchor="w", padx=55)
+        )
+        label_categorie.pack(anchor="w", padx=55)
 
         valeurs_categories = (
             self.categories
             if self.categories
-            else ["Sans catégorie"]
+            else ["Aucun budget disponible"]
         )
 
         champ_categorie = ctk.CTkOptionMenu(
@@ -544,6 +551,30 @@ class VueTransactions(ctk.CTkFrame):
             button_color=self.vert_fonce
         )
         champ_categorie.pack(pady=(5, 12))
+
+        aide_categorie = ctk.CTkLabel(
+            fenetre, text="", text_color=self.gris, font=("Arial", 11)
+        )
+        aide_categorie.pack(anchor="w", padx=55, pady=(0, 3))
+
+        def actualiser_categorie(type_transaction):
+            if type_transaction == "Revenu":
+                label_categorie.configure(text="Type de revenu")
+                champ_categorie.configure(values=self.CATEGORIES_REVENUS)
+                champ_categorie.set(self.CATEGORIES_REVENUS[0])
+                aide_categorie.configure(
+                    text="Un revenu n'est rattaché à aucun budget de dépense."
+                )
+            else:
+                label_categorie.configure(text="Budget de dépense")
+                champ_categorie.configure(values=valeurs_categories)
+                champ_categorie.set(valeurs_categories[0])
+                aide_categorie.configure(
+                    text="La dépense sera déduite du budget sélectionné."
+                )
+
+        champ_type.configure(command=actualiser_categorie)
+        actualiser_categorie("Dépense")
 
         # Date : saisie manuelle ou sélection dans un calendrier
         zone_date = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
@@ -620,6 +651,7 @@ class VueTransactions(ctk.CTkFrame):
             champ_type.set(
                 transaction.get("type", "Dépense")
             )
+            actualiser_categorie(champ_type.get())
 
             champ_libelle.insert(
                 0,
@@ -636,9 +668,14 @@ class VueTransactions(ctk.CTkFrame):
                 "Sans catégorie"
             )
 
-            if categorie not in valeurs_categories:
+            categories_type = (
+                self.CATEGORIES_REVENUS
+                if champ_type.get() == "Revenu"
+                else valeurs_categories
+            )
+            if categorie not in categories_type:
                 champ_categorie.configure(
-                    values=valeurs_categories + [categorie]
+                    values=categories_type + [categorie]
                 )
 
             champ_categorie.set(categorie)
@@ -678,6 +715,10 @@ class VueTransactions(ctk.CTkFrame):
                 message.configure(
                     text="Veuillez remplir tous les champs."
                 )
+                return
+
+            if type_transaction == "Dépense" and categorie == "Aucun budget disponible":
+                message.configure(text="Créez d'abord un budget pour enregistrer cette dépense.")
                 return
 
             # Validation du montant

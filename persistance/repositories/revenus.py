@@ -10,7 +10,7 @@ class RepositoryRevenus:
 
     def ajouter_revenu(
         self, utilisateur_id: int, montant: float, date: str,
-        description: str | None, statut: str,
+        description: str | None, statut: str, categorie: str = "Salaire",
     ) -> int:
         """Enregistrer un revenu et retourner son identifiant.
 
@@ -21,9 +21,9 @@ class RepositoryRevenus:
         with self.connexion:
             curseur = self.connexion.execute(
                 "INSERT INTO revenus "
-                "(utilisateur_id, montant, date, description, statut) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (utilisateur_id, montant, date, description, statut),
+                "(utilisateur_id, montant, date, description, statut, categorie) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (utilisateur_id, montant, date, description, statut, categorie),
             )
             identifiant = curseur.lastrowid
             assert identifiant is not None
@@ -34,7 +34,7 @@ class RepositoryRevenus:
     ) -> dict[str, Any] | None:
         """Retourner le revenu du propriétaire, ou None s'il est introuvable."""
         curseur = self.connexion.execute(
-            "SELECT id, utilisateur_id, montant, date, description, statut "
+            "SELECT id, utilisateur_id, montant, date, description, statut, categorie "
             "FROM revenus WHERE utilisateur_id = ? AND id = ?",
             (utilisateur_id, revenu_id),
         )
@@ -48,7 +48,7 @@ class RepositoryRevenus:
         """Lister par date décroissante, avec bornes inclusives et statut optionnel."""
         filtre, valeurs = self._filtre(utilisateur_id, debut, fin, statut)
         curseur = self.connexion.execute(
-            "SELECT id, utilisateur_id, montant, date, description, statut "
+            "SELECT id, utilisateur_id, montant, date, description, statut, categorie "
             "FROM revenus WHERE " + filtre + " ORDER BY date DESC, id DESC",
             valeurs,
         )
@@ -56,14 +56,14 @@ class RepositoryRevenus:
 
     def modifier_revenu(
         self, utilisateur_id: int, revenu_id: int, montant: float,
-        date: str, description: str | None, statut: str,
+        date: str, description: str | None, statut: str, categorie: str = "Salaire",
     ) -> bool:
         """Remplacer les champs ; retourner False si le revenu est inaccessible."""
         with self.connexion:
             curseur = self.connexion.execute(
                 "UPDATE revenus SET montant = ?, date = ?, description = ?, "
-                "statut = ? WHERE utilisateur_id = ? AND id = ?",
-                (montant, date, description, statut, utilisateur_id, revenu_id),
+                "statut = ?, categorie = ? WHERE utilisateur_id = ? AND id = ?",
+                (montant, date, description, statut, categorie, utilisateur_id, revenu_id),
             )
             return curseur.rowcount > 0
 

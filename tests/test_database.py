@@ -12,3 +12,17 @@ def test_initialiser_schema_et_cles_etrangeres() -> None:
     with __import__("pytest").raises(sqlite3.IntegrityError):
         connexion.execute("INSERT INTO categories (utilisateur_id,nom) VALUES (999,'Interdite')")
     connexion.close()
+
+
+def test_migrer_une_base_existante_avec_categorie_de_revenu(tmp_path) -> None:
+    chemin = tmp_path / "ancienne.db"
+    base = Database()
+    connexion = base.connecter(str(chemin))
+    connexion.execute(
+        "CREATE TABLE revenus (id INTEGER PRIMARY KEY, utilisateur_id INTEGER NOT NULL, "
+        "montant REAL NOT NULL, date TEXT NOT NULL, description TEXT, statut TEXT NOT NULL)"
+    )
+    base.initialiser_schema(connexion)
+    colonnes = {ligne[1] for ligne in connexion.execute("PRAGMA table_info(revenus)")}
+    assert "categorie" in colonnes
+    connexion.close()
