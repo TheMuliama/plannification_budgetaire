@@ -4,6 +4,10 @@
 
 ### Added
 
+- Ajouter la persistance des comptes utilisateurs, avec création, lecture et
+  suppression contrôlées par SQLite
+  ([#3](https://github.com/TheMuliama/plannification_budgetaire/issues/3)).
+
 - Intégrer les écrans de gestion budgétaire de la branche `feat/interface` :
   tableau de bord, transactions, budgets, alertes, factures, inscription et paramètres.
   Les données restent temporaires en mémoire et la connexion est simulée ;
