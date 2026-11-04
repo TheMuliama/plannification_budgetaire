@@ -1,1 +1,3 @@
-
+customtkinter>=5.2
+matplotlib>=3.8
+tkcalendar>=1.6.1
