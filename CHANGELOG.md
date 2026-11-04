@@ -4,6 +4,14 @@
 
 ### Added
 
+- Ajouter les transactions récurrentes hebdomadaires, mensuelles ou annuelles,
+  avec une date de fin et le statut prévu pour les occurrences futures.
+
+- Raccorder les sous-catégories aux budgets et aux dépenses dans l'interface.
+
+- Afficher pour chaque objectif le reste à épargner, le minimum mensuel, le
+  revenu utilisable et l'épargne maximale disponible.
+
 - Catégoriser les revenus (salaire, remboursement, cadeau, prime ou autre)
   sans les rattacher aux budgets de dépenses, avec migration des bases existantes.
 
@@ -58,6 +66,10 @@
   ([#2](https://github.com/TheMuliama/plannification_budgetaire/issues/2)).
 
 ### Fixed
+
+- Rendre les calendriers des transactions et objectifs réellement interactifs.
+
+- Trier l'historique des transactions par date et masquer les alertes avant 80 %.
 
 - Harmoniser les couleurs et la présentation de l'écran Épargne et projection.
 

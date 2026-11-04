@@ -277,9 +277,10 @@ class VueBudgets(ctk.CTkFrame):
         )
 
         categorie = budget.get(
+            "libelle", budget.get(
             "categorie",
             "Sans catégorie"
-        )
+        ))
 
         ctk.CTkLabel(
             haut,
@@ -347,7 +348,7 @@ class VueBudgets(ctk.CTkFrame):
         if budget.get("alerte") == "attention":
             couleur = self.orange
 
-        elif budget.get("alerte") == "depasse":
+        elif budget.get("alerte") == "risque":
             couleur = self.rouge
 
         barre = ctk.CTkProgressBar(
@@ -400,7 +401,7 @@ class VueBudgets(ctk.CTkFrame):
             else "Ajouter un budget"
         )
 
-        centrer_fenetre(fenetre, self.winfo_toplevel(), 430, 400)
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 430, 485)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
@@ -434,6 +435,15 @@ class VueBudgets(ctk.CTkFrame):
         )
         champ_categorie.pack(pady=(5, 15))
 
+        ctk.CTkLabel(
+            fenetre, text="Sous-catégorie (facultative)", text_color=self.texte
+        ).pack(anchor="w", padx=45)
+        champ_sous_categorie = ctk.CTkEntry(
+            fenetre, width=340, height=40,
+            placeholder_text="Exemple : Supermarché, Restaurant..."
+        )
+        champ_sous_categorie.pack(pady=(5, 15))
+
         # Champ plafond
         ctk.CTkLabel(
             fenetre,
@@ -452,8 +462,11 @@ class VueBudgets(ctk.CTkFrame):
         if modification:
             champ_categorie.insert(
                 0,
-                str(budget.get("categorie", ""))
+                str(budget.get("categorie_parent", budget.get("categorie", "")))
             )
+
+            if budget.get("sous_categorie"):
+                champ_sous_categorie.insert(0, str(budget["sous_categorie"]))
 
             champ_plafond.insert(
                 0,
@@ -470,6 +483,7 @@ class VueBudgets(ctk.CTkFrame):
 
         def valider():
             categorie = champ_categorie.get().strip()
+            sous_categorie = champ_sous_categorie.get().strip() or None
             texte_plafond = (
                 champ_plafond.get()
                 .strip()
@@ -505,7 +519,7 @@ class VueBudgets(ctk.CTkFrame):
                     return
 
                 try:
-                    self.on_modifier(budget.get("id"), categorie, plafond)
+                    self.on_modifier(budget.get("id"), categorie, sous_categorie, plafond)
                 except (ConnectionError, OSError, ValueError) as erreur:
                     message.configure(text=str(erreur))
                     return
@@ -518,7 +532,7 @@ class VueBudgets(ctk.CTkFrame):
                     return
 
                 try:
-                    self.on_ajouter(categorie, plafond)
+                    self.on_ajouter(categorie, sous_categorie, plafond)
                 except (ConnectionError, OSError, ValueError) as erreur:
                     message.configure(text=str(erreur))
                     return
@@ -541,7 +555,7 @@ class VueBudgets(ctk.CTkFrame):
         confirmation = messagebox.askyesno(
             "Confirmation",
             "Voulez-vous vraiment supprimer le budget "
-            f"« {budget.get('categorie', '')} » ?",
+            f"« {budget.get('libelle', budget.get('categorie', ''))} » ?",
             parent=self.winfo_toplevel()
         )
 

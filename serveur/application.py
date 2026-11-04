@@ -40,14 +40,19 @@ class ApplicationServeur:
             "utilisateurs.changer_mot_de_passe":self.changer_mot_de_passe,
             "utilisateurs.supprimer":self.supprimer_compte,
             "categories.creer":self.creer_categorie,
-            "categories.lister":self.lister_categories,"revenus.creer":self.creer_revenu,
+            "categories.lister":self.lister_categories,
+            "sous_categories.creer":self.creer_sous_categorie,
+            "sous_categories.lister":self.lister_sous_categories,
+            "revenus.creer":self.creer_revenu,
             "revenus.modifier":self.modifier_revenu,"revenus.supprimer":self.supprimer_revenu,
             "revenus.lister":self.lister_revenus,"budgets.creer":self.creer_budget,
             "budgets.modifier":self.modifier_budget,"budgets.supprimer":self.supprimer_budget,
             "budgets.lister":self.lister_budgets,"depenses.creer":self.creer_depense,
             "depenses.modifier":self.modifier_depense,"depenses.supprimer":self.supprimer_depense,
             "depenses.lister":self.lister_depenses,"objectifs.creer":self.creer_objectif,
-            "objectifs.lister":self.lister_objectifs,"projection.simuler":self.simuler_depense}
+            "objectifs.lister":self.lister_objectifs,
+            "objectifs.analyser":self.analyser_objectifs,
+            "projection.simuler":self.simuler_depense}
 
     def creer_compte(self, d: dict[str,Any]) -> dict[str,Any]:
         return self.utilisateurs.creer_compte(d["identifiant"],d["mot_de_passe"])
@@ -72,6 +77,10 @@ class ApplicationServeur:
         except KeyError as erreur: raise ValueError("Session invalide ou expirée.") from erreur
     def creer_categorie(self,d): return self.categories.creer_categorie(self._id(d),d["nom"])
     def lister_categories(self,d): return self.categories.recuperer_categories(self._id(d))
+    def creer_sous_categorie(self,d):
+        return self.categories.creer_sous_categorie(self._id(d),d["categorie_id"],d["nom"])
+    def lister_sous_categories(self,d):
+        return self.categories.recuperer_sous_categories(self._id(d),d["categorie_id"])
     def creer_revenu(self,d): return self.revenus.ajouter_revenu({**d,"utilisateur_id":self._id(d)})
     def modifier_revenu(self,d): return self.revenus.modifier_revenu(self._id(d),d["id"],d)
     def supprimer_revenu(self,d): self.revenus.supprimer_revenu(self._id(d),d["id"]); return None
@@ -86,6 +95,24 @@ class ApplicationServeur:
     def lister_depenses(self,d): return self.depenses.consulter_depenses(self._id(d),d.get("statut"))
     def creer_objectif(self,d): return self.objectifs.creer_objectif({**d,"utilisateur_id":self._id(d)})
     def lister_objectifs(self,d): return self.objectifs.consulter_objectifs(self._id(d))
+    def analyser_objectifs(self,d):
+        utilisateur_id=self._id(d); aujourd_hui=date.today()
+        debut=aujourd_hui.replace(day=1).isoformat()
+        revenus=self.revenus.consulter_revenus(utilisateur_id,debut,aujourd_hui.isoformat(),"recu")
+        depenses=self.depenses.consulter_depenses(utilisateur_id,"realisee")
+        depenses=[x for x in depenses if debut <= x["date"] <= aujourd_hui.isoformat()]
+        revenu_mois=sum(float(x["montant"]) for x in revenus)
+        depense_mois=sum(float(x["montant"]) for x in depenses)
+        epargne_maximale=max(0.0,revenu_mois-depense_mois)
+        analyses=[]
+        for objectif in self.objectifs.consulter_objectifs(utilisateur_id):
+            plan=self.objectifs.determiner_plan_epargne({**objectif,"utilisateur_id":utilisateur_id})
+            requise=float(plan["montant_periodique_recommande"])
+            analyses.append({**objectif,**plan,"revenus_mois":round(revenu_mois,2),
+                "depenses_mois":round(depense_mois,2),"epargne_maximale":round(epargne_maximale,2),
+                "revenu_utilisable":round(max(0.0,revenu_mois-requise),2),
+                "objectif_atteignable":requise <= epargne_maximale})
+        return analyses
     def simuler_depense(self,d):
         utilisateur_id=self._id(d)
         aujourd_hui=date.today()

@@ -161,6 +161,17 @@ class VueTransactions(ctk.CTkFrame):
         )
         self.filtre_type.set("Toutes")
 
+        self.tri_date = ctk.CTkOptionMenu(
+            filtres,
+            values=["Plus récentes", "Plus anciennes"],
+            width=160,
+            fg_color=self.vert,
+            button_color=self.vert_fonce,
+            command=lambda _valeur: self._afficher_transactions(),
+        )
+        self.tri_date.pack(side="left", padx=5)
+        self.tri_date.set("Plus récentes")
+
         # Titre de la liste
         ctk.CTkLabel(
             self,
@@ -328,6 +339,16 @@ class VueTransactions(ctk.CTkFrame):
 
             transactions_filtrees.append(transaction)
 
+        def cle_date(transaction):
+            try:
+                return datetime.strptime(str(transaction.get("date", "")), "%d/%m/%Y")
+            except ValueError:
+                return datetime.min
+
+        transactions_filtrees.sort(
+            key=cle_date, reverse=self.tri_date.get() == "Plus récentes"
+        )
+
         if not transactions_filtrees:
             ctk.CTkLabel(
                 self.liste_transactions,
@@ -474,7 +495,7 @@ class VueTransactions(ctk.CTkFrame):
         )
         #fenetre.geometry("450x540")
         
-        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 590)
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 720)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
@@ -588,17 +609,18 @@ class VueTransactions(ctk.CTkFrame):
         )
         champ_date.pack(side="left")
 
-        def ouvrir_calendrier():
+        def ouvrir_calendrier(champ, titre="Choisir une date"):
             """Afficher un calendrier pour le champ date du formulaire."""
             calendrier_fenetre = ctk.CTkToplevel(fenetre)
-            calendrier_fenetre.title("Choisir une date")
+            calendrier_fenetre.title(titre)
             calendrier_fenetre.resizable(False, False)
             calendrier_fenetre.transient(fenetre)
-            centrer_fenetre(calendrier_fenetre, fenetre, 240, 210)
+            centrer_fenetre(calendrier_fenetre, fenetre, 300, 300)
+            calendrier_fenetre.grab_set()
 
             try:
                 date_initiale = datetime.strptime(
-                    champ_date.get().strip(), "%d/%m/%Y"
+                    champ.get().strip(), "%d/%m/%Y"
                 )
             except ValueError:
                 date_initiale = datetime.now()
@@ -621,8 +643,8 @@ class VueTransactions(ctk.CTkFrame):
             calendrier.pack(padx=16, pady=(16, 10))
 
             def choisir_date():
-                champ_date.delete(0, "end")
-                champ_date.insert(0, calendrier.get_date())
+                champ.delete(0, "end")
+                champ.insert(0, calendrier.get_date())
                 calendrier_fenetre.destroy()
 
             ctk.CTkButton(
@@ -643,8 +665,37 @@ class VueTransactions(ctk.CTkFrame):
             fg_color="#E8F2EE",
             text_color="#00634F",
             hover_color="#D6E9E1",
-            command=ouvrir_calendrier
+            command=lambda: ouvrir_calendrier(champ_date)
         ).pack(side="left", padx=(10, 0))
+
+        zone_recurrence = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
+        zone_recurrence.pack(pady=(4, 8))
+        ctk.CTkLabel(
+            zone_recurrence, text="Récurrence", text_color=self.texte, width=100, anchor="w"
+        ).pack(side="left")
+        champ_frequence = ctk.CTkOptionMenu(
+            zone_recurrence,
+            values=["Aucune", "Hebdomadaire", "Mensuelle", "Annuelle"],
+            width=230, fg_color=self.vert, button_color=self.vert_fonce,
+        )
+        champ_frequence.pack(side="left", padx=(10, 0))
+        champ_frequence.set("Aucune")
+
+        zone_fin = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
+        zone_fin.pack(pady=(0, 8))
+        champ_date_fin = ctk.CTkEntry(
+            zone_fin, width=290, height=40,
+            placeholder_text="Fin de récurrence (JJ/MM/AAAA)"
+        )
+        champ_date_fin.pack(side="left")
+        ctk.CTkButton(
+            zone_fin, text="📅", width=40, height=40, fg_color="#E8F2EE",
+            text_color="#00634F", hover_color="#D6E9E1",
+            command=lambda: ouvrir_calendrier(champ_date_fin, "Choisir la fin de récurrence"),
+        ).pack(side="left", padx=(10, 0))
+        if modification:
+            champ_frequence.configure(state="disabled")
+            champ_date_fin.configure(state="disabled")
 
         # Préremplissage lors d'une modification
         if modification:
@@ -710,6 +761,8 @@ class VueTransactions(ctk.CTkFrame):
             )
             categorie = champ_categorie.get()
             date = champ_date.get().strip()
+            frequence = champ_frequence.get()
+            date_fin = champ_date_fin.get().strip()
 
             if not libelle or not texte_montant or not date:
                 message.configure(
@@ -745,13 +798,26 @@ class VueTransactions(ctk.CTkFrame):
                 )
                 return
 
+            if frequence != "Aucune":
+                try:
+                    fin = datetime.strptime(date_fin, "%d/%m/%Y")
+                    debut = datetime.strptime(date, "%d/%m/%Y")
+                except ValueError:
+                    message.configure(text="Choisissez une date de fin de récurrence valide.")
+                    return
+                if fin < debut:
+                    message.configure(text="La fin de récurrence doit suivre la première date.")
+                    return
+
             # Données à transmettre
             donnees = {
                 "type": type_transaction,
                 "libelle": libelle,
                 "montant": montant,
                 "categorie": categorie,
-                "date": date
+                "date": date,
+                "frequence": frequence,
+                "date_fin": date_fin or None,
             }
 
             if modification:

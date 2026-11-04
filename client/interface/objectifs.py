@@ -126,7 +126,8 @@ class VueObjectifs(ctk.CTkFrame):
         fenetre.title("Choisir une date cible")
         fenetre.resizable(False, False)
         fenetre.transient(self.winfo_toplevel())
-        centrer_fenetre(fenetre, self.winfo_toplevel(), 240, 210)
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 300, 300)
+        fenetre.grab_set()
         try:
             initiale = datetime.strptime(self.champs["date_cible"].get().strip(), "%d/%m/%Y")
         except ValueError:
@@ -220,6 +221,32 @@ class VueObjectifs(ctk.CTkFrame):
                 carte, text=texte.replace(",", " ").replace(".", ","),
                 text_color=self.SECONDAIRE,
             ).pack(anchor="w", padx=16)
+            def euros(valeur):
+                return f"{float(valeur):,.2f} €".replace(",", " ").replace(".", ",")
+
+            indicateurs = ctk.CTkFrame(carte, fg_color="transparent")
+            indicateurs.pack(fill="x", padx=16, pady=(9, 2))
+            elements = (
+                ("Reste à épargner", euros(objectif.get("montant_restant", cible-actuel))),
+                ("Épargne minimale / mois", euros(objectif.get("montant_periodique_recommande", 0))),
+                ("Revenu utilisable / mois", euros(objectif.get("revenu_utilisable", 0))),
+                ("Épargne maximale ce mois", euros(objectif.get("epargne_maximale", 0))),
+            )
+            for titre, valeur in elements:
+                bloc = ctk.CTkFrame(indicateurs, fg_color="#F7F8F7", corner_radius=7)
+                bloc.pack(side="left", fill="x", expand=True, padx=(0, 6))
+                ctk.CTkLabel(
+                    bloc, text=titre, text_color=self.SECONDAIRE, font=("Arial", 10)
+                ).pack(anchor="w", padx=9, pady=(7, 1))
+                ctk.CTkLabel(
+                    bloc, text=valeur, text_color=self.TEXTE, font=("Arial", 12, "bold")
+                ).pack(anchor="w", padx=9, pady=(0, 7))
+            if not objectif.get("objectif_atteignable", True):
+                ctk.CTkLabel(
+                    carte,
+                    text="⚠ L'épargne disponible ce mois est inférieure au minimum nécessaire.",
+                    text_color=self.ROUGE,
+                ).pack(anchor="w", padx=16, pady=(5, 0))
             barre = ctk.CTkProgressBar(carte, progress_color=self.VERT, height=10)
             barre.pack(fill="x", padx=16, pady=(8, 14))
             barre.set(progression)

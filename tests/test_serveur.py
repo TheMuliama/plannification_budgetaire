@@ -38,6 +38,20 @@ def test_parcours_authentifie_et_isole() -> None:
     creation=serveur.traiter_message({"action":"categories.creer","donnees":{
         "session":session,"nom":"Courses"}})
     assert creation["donnees"]["nom"]=="Courses"
+    sous_categorie=serveur.traiter_message({"action":"sous_categories.creer","donnees":{
+        "session":session,"categorie_id":creation["donnees"]["id"],"nom":"Marché"}})
+    assert sous_categorie["donnees"]["nom"]=="Marché"
+    liste=serveur.traiter_message({"action":"sous_categories.lister","donnees":{
+        "session":session,"categorie_id":creation["donnees"]["id"]}})
+    assert liste["donnees"]==[sous_categorie["donnees"]]
+    objectif=serveur.traiter_message({"action":"objectifs.creer","donnees":{
+        "session":session,"nom":"Voyage","montant_cible":1200,
+        "montant_actuel":0,"date_cible":"2099-12-31"}})
+    assert objectif["succes"] is True
+    analyse=serveur.traiter_message({"action":"objectifs.analyser","donnees":{
+        "session":session}})
+    assert analyse["donnees"][0]["montant_restant"]==1200
+    assert "epargne_maximale" in analyse["donnees"][0]
     assert serveur.traiter_message({"action":"categories.lister","donnees":{
         "session":"invalide"}})["succes"] is False
     connexion.close()
