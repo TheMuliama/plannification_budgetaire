@@ -1,5 +1,8 @@
 """Tests du protocole serveur."""
 from serveur.communication.serveur_socket import ServeurSocket
+from pathlib import Path
+from persistance.database import Database
+from serveur.application import ApplicationServeur
 
 
 def test_router_une_requete_json() -> None:
@@ -17,3 +20,19 @@ def test_convertir_erreur_metier_en_reponse() -> None:
     def echouer(donnees): raise ValueError("Données invalides")
     reponse=ServeurSocket({"echouer":echouer}).traiter_message({"action":"echouer"})
     assert reponse["erreur"]=="Données invalides"
+
+def test_parcours_authentifie_et_isole() -> None:
+    connexion=Database().connecter(":memory:")
+    connexion.executescript(Path("persistance/schema.sql").read_text(encoding="utf-8"))
+    application=ApplicationServeur(connexion); serveur=ServeurSocket(application.traitements())
+    assert serveur.traiter_message({"action":"utilisateurs.creer","donnees":{
+        "identifiant":"u1","mot_de_passe":"mot-de-passe"}})["succes"] is True
+    connexion_reponse=serveur.traiter_message({"action":"utilisateurs.connecter","donnees":{
+        "identifiant":"u1","mot_de_passe":"mot-de-passe"}})
+    session=connexion_reponse["donnees"]["session"]
+    creation=serveur.traiter_message({"action":"categories.creer","donnees":{
+        "session":session,"nom":"Courses"}})
+    assert creation["donnees"]["nom"]=="Courses"
+    assert serveur.traiter_message({"action":"categories.lister","donnees":{
+        "session":"invalide"}})["succes"] is False
+    connexion.close()
