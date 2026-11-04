@@ -14,7 +14,7 @@ class GestionnaireRevenus:
     calculs.
     """
 
-    CATEGORIES = {"Salaire", "Remboursement", "Cadeau", "Prime", "Autre"}
+    CATEGORIES = frozenset({"Salaire", "Remboursement", "Cadeau", "Prime", "Autre"})
 
     def __init__(self, repository: RepositoryRevenus) -> None:
         self._repository = repository
@@ -161,4 +161,6 @@ class GestionnaireRevenus:
         try:
             date.fromisoformat(valeur)
         except (TypeError, ValueError) as erreur:
-            raise ValueError("La date du revenu doit être au format AAAA-MM-JJ.") from erreur
+            raise ValueError(
+                "La date du revenu doit être au format AAAA-MM-JJ."
+            ) from erreur

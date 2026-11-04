@@ -21,15 +21,12 @@ class GestionnaireUtilisateurs:
         self,
         identifiant: str,
         mot_de_passe: str,
-        donnees_compte: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Créer un compte utilisateur.
 
         Args:
             identifiant: Identifiant du compte.
             mot_de_passe: Mot de passe du compte.
-            donnees_compte: Informations complémentaires du compte.
-
         Returns:
             Le compte créé.
         """
@@ -73,7 +70,9 @@ class GestionnaireUtilisateurs:
         utilisateur = self._repository.recuperer_par_identifiant(
             self._valider_identifiant(identifiant)
         )
-        if utilisateur is None or not self._repository.supprimer_utilisateur(utilisateur["id"]):
+        if utilisateur is None or not self._repository.supprimer_utilisateur(
+            utilisateur["id"]
+        ):
             raise ValueError("Compte utilisateur introuvable.")
 
     def recuperer_compte(self, identifiant: str) -> dict[str, Any]:
@@ -92,11 +91,23 @@ class GestionnaireUtilisateurs:
             raise ValueError("Compte utilisateur introuvable.")
         return self._sans_mot_de_passe(utilisateur)
 
-    def changer_mot_de_passe(self, identifiant_utilisateur: int,
-                             ancien: str, nouveau: str) -> None:
-        """Vérifier l'ancien secret avant d'enregistrer le nouveau hachage."""
+    def changer_mot_de_passe(
+        self, identifiant_utilisateur: int, ancien: str, nouveau: str
+    ) -> None:
+        """Changer le mot de passe après vérification de l'ancien.
+
+        Args:
+            identifiant_utilisateur: Identifiant du compte à modifier.
+            ancien: Mot de passe actuel.
+            nouveau: Nouveau mot de passe à enregistrer.
+
+        Raises:
+            ValueError: Si le compte ou l'un des mots de passe est invalide.
+        """
         utilisateur = self._repository.recuperer_par_id(identifiant_utilisateur)
-        if utilisateur is None or not verifier_mot_de_passe(ancien, utilisateur["mot_de_passe"]):
+        if utilisateur is None or not verifier_mot_de_passe(
+            ancien, utilisateur["mot_de_passe"]
+        ):
             raise ValueError("Le mot de passe actuel est incorrect.")
         self._valider_mot_de_passe(nouveau)
         if ancien == nouveau:
@@ -106,11 +117,22 @@ class GestionnaireUtilisateurs:
             hacher_mot_de_passe(nouveau),
         )
 
-    def supprimer_compte_authentifie(self, identifiant_utilisateur: int,
-                                     mot_de_passe: str) -> None:
-        """Supprimer le compte après une nouvelle vérification du secret."""
-        utilisateur=self._repository.recuperer_par_id(identifiant_utilisateur)
-        if utilisateur is None or not verifier_mot_de_passe(mot_de_passe,utilisateur["mot_de_passe"]):
+    def supprimer_compte_authentifie(
+        self, identifiant_utilisateur: int, mot_de_passe: str
+    ) -> None:
+        """Supprimer un compte après une nouvelle vérification du secret.
+
+        Args:
+            identifiant_utilisateur: Identifiant du compte à supprimer.
+            mot_de_passe: Mot de passe de confirmation.
+
+        Raises:
+            ValueError: Si le compte ou le mot de passe est invalide.
+        """
+        utilisateur = self._repository.recuperer_par_id(identifiant_utilisateur)
+        if utilisateur is None or not verifier_mot_de_passe(
+            mot_de_passe, utilisateur["mot_de_passe"]
+        ):
             raise ValueError("Le mot de passe est incorrect.")
         self._repository.supprimer_utilisateur(identifiant_utilisateur)
 
@@ -128,7 +150,5 @@ class GestionnaireUtilisateurs:
     @staticmethod
     def _sans_mot_de_passe(utilisateur: dict[str, Any]) -> dict[str, Any]:
         return {
-            cle: valeur
-            for cle, valeur in utilisateur.items()
-            if cle != "mot_de_passe"
+            cle: valeur for cle, valeur in utilisateur.items() if cle != "mot_de_passe"
         }

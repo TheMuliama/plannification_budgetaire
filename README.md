@@ -287,7 +287,6 @@ gantt
 À réaliser uniquement après la validation du MVP.
 
 - [ ] Recherche et filtrage
-- [ ] Gestion des factures
 - [ ] Gestion des investissements
 - [ ] Documentation utilisateur
 - [ ] Documentation technique
@@ -449,7 +448,6 @@ Tout ce qui est nécessaire au parcours utilisateur minimum :
 ## Priorité 2 — Après le MVP
 
 - recherche et filtrage ;
-- factures ;
 - investissements ;
 - documentation avancée ;
 - améliorations graphiques.

@@ -50,7 +50,7 @@
   ([#6](https://github.com/TheMuliama/plannification_budgetaire/issues/6)).
 
 - Intégrer les écrans de gestion budgétaire de la branche `feat/interface` :
-  tableau de bord, transactions, budgets, alertes, factures, inscription et paramètres.
+  tableau de bord, transactions, budgets, alertes, inscription et paramètres.
   Les données restent temporaires en mémoire et la connexion est simulée ;
   le raccordement au serveur et à SQLite reste à réaliser
   ([#10](https://github.com/TheMuliama/plannification_budgetaire/pull/10)).

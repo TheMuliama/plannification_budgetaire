@@ -37,12 +37,20 @@ class Database:
         connexion.close()
 
     def initialiser_schema(
-        self, connexion: sqlite3.Connection, chemin_schema: str = "persistance/schema.sql"
+        self,
+        connexion: sqlite3.Connection,
+        chemin_schema: str = "persistance/schema.sql",
     ) -> None:
-        """Créer le schéma et appliquer les migrations légères nécessaires."""
+        """Créer le schéma et appliquer les migrations légères nécessaires.
+
+        Args:
+            connexion: Connexion SQLite à initialiser.
+            chemin_schema: Chemin du fichier contenant le schéma SQL.
+        """
         connexion.executescript(Path(chemin_schema).read_text(encoding="utf-8"))
         colonnes_revenus = {
-            ligne[1] for ligne in connexion.execute("PRAGMA table_info(revenus)").fetchall()
+            ligne[1]
+            for ligne in connexion.execute("PRAGMA table_info(revenus)").fetchall()
         }
         if "categorie" not in colonnes_revenus:
             with connexion:

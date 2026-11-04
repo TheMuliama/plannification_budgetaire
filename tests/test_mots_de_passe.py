@@ -65,6 +65,9 @@ def test_refuser_un_hachage_invalide(hachage_invalide: str) -> None:
 
 def test_refuser_un_hachage_tronque(mot_de_passe_hache: str) -> None:
     """Refuser un hachage réel dont la partie finale a été supprimée."""
-    assert verifier_mot_de_passe(
-        "Exemple-fictif-302!", mot_de_passe_hache.rsplit("$", 1)[0]
-    ) is False
+    assert (
+        verifier_mot_de_passe(
+            "Exemple-fictif-302!", mot_de_passe_hache.rsplit("$", 1)[0]
+        )
+        is False
+    )

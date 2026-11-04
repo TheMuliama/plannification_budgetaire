@@ -38,19 +38,22 @@ def test_ajouter_et_obtenir_un_revenu(repository_revenus: RepositoryRevenus) -> 
 
 
 def test_modifier_et_supprimer_un_revenu(repository_revenus: RepositoryRevenus) -> None:
-    revenu_id = repository_revenus.ajouter_revenu(
-        1, 100, "2026-11-01", None, "prevu"
-    )
+    revenu_id = repository_revenus.ajouter_revenu(1, 100, "2026-11-01", None, "prevu")
 
-    assert repository_revenus.modifier_revenu(
-        1, revenu_id, 120, "2026-11-02", "Mission", "recu"
-    ) is True
+    assert (
+        repository_revenus.modifier_revenu(
+            1, revenu_id, 120, "2026-11-02", "Mission", "recu"
+        )
+        is True
+    )
     assert repository_revenus.obtenir_revenu(1, revenu_id)["montant"] == 120
     assert repository_revenus.supprimer_revenu(1, revenu_id) is True
     assert repository_revenus.obtenir_revenu(1, revenu_id) is None
 
 
-def test_filtrer_et_totaliser_les_revenus(repository_revenus: RepositoryRevenus) -> None:
+def test_filtrer_et_totaliser_les_revenus(
+    repository_revenus: RepositoryRevenus,
+) -> None:
     repository_revenus.ajouter_revenu(1, 100, "2026-10-31", None, "recu")
     repository_revenus.ajouter_revenu(1, 200, "2026-11-01", None, "prevu")
     repository_revenus.ajouter_revenu(1, 300, "2026-11-02", None, "recu")
@@ -66,16 +69,19 @@ def test_filtrer_et_totaliser_les_revenus(repository_revenus: RepositoryRevenus)
     assert repository_revenus.total_revenus(1, statut="recu") == 400
 
 
-def test_isoler_les_revenus_par_utilisateur(repository_revenus: RepositoryRevenus) -> None:
-    revenu_id = repository_revenus.ajouter_revenu(
-        1, 100, "2026-11-04", None, "recu"
-    )
+def test_isoler_les_revenus_par_utilisateur(
+    repository_revenus: RepositoryRevenus,
+) -> None:
+    revenu_id = repository_revenus.ajouter_revenu(1, 100, "2026-11-04", None, "recu")
 
     assert repository_revenus.obtenir_revenu(2, revenu_id) is None
     assert repository_revenus.consulter_revenus(2) == []
-    assert repository_revenus.modifier_revenu(
-        2, revenu_id, 999, "2026-11-04", None, "recu"
-    ) is False
+    assert (
+        repository_revenus.modifier_revenu(
+            2, revenu_id, 999, "2026-11-04", None, "recu"
+        )
+        is False
+    )
     assert repository_revenus.supprimer_revenu(2, revenu_id) is False
 
 

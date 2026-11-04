@@ -17,7 +17,11 @@ class ClientSocket:
 
     @property
     def est_connecte(self) -> bool:
-        """Indiquer si une connexion réseau est ouverte."""
+        """Indiquer si une connexion réseau est ouverte.
+
+        Returns:
+            ``True`` lorsqu'un socket est actuellement disponible.
+        """
         return self._socket is not None
 
     def connecter(self, adresse: str, port: int) -> None:
@@ -43,8 +47,11 @@ class ClientSocket:
         Returns:
             None.
         """
-        if self._socket is None: raise ConnectionError("Le client n'est pas connecté.")
-        donnees=(json.dumps(message,ensure_ascii=False,separators=(",",":"))+"\n").encode("utf-8")
+        if self._socket is None:
+            raise ConnectionError("Le client n'est pas connecté.")
+        donnees = (
+            json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n"
+        ).encode("utf-8")
         self._socket.sendall(donnees)
 
     def recevoir(self) -> dict[str, Any]:
@@ -53,16 +60,33 @@ class ClientSocket:
         Returns:
             Les données reçues du serveur.
         """
-        if self._lecture is None: raise ConnectionError("Le client n'est pas connecté.")
-        ligne=self._lecture.readline()
-        if not ligne: raise ConnectionError("Le serveur a fermé la connexion.")
-        resultat=json.loads(ligne)
-        if not isinstance(resultat,dict): raise ValueError("La réponse doit être un objet JSON.")
+        if self._lecture is None:
+            raise ConnectionError("Le client n'est pas connecté.")
+        ligne = self._lecture.readline()
+        if not ligne:
+            raise ConnectionError("Le serveur a fermé la connexion.")
+        resultat = json.loads(ligne)
+        if not isinstance(resultat, dict):
+            raise TypeError("La réponse doit être un objet JSON.")
         return resultat
 
     def demander(self, message: dict[str, Any]) -> dict[str, Any]:
-        self.envoyer(message); return self.recevoir()
+        """Envoyer une requête puis attendre sa réponse.
+
+        Args:
+            message: Requête JSON à transmettre au serveur.
+
+        Returns:
+            Réponse JSON décodée du serveur.
+        """
+        self.envoyer(message)
+        return self.recevoir()
 
     def fermer(self) -> None:
-        if self._lecture is not None: self._lecture.close(); self._lecture=None
-        if self._socket is not None: self._socket.close(); self._socket=None
+        """Fermer le flux de lecture et le socket courant."""
+        if self._lecture is not None:
+            self._lecture.close()
+            self._lecture = None
+        if self._socket is not None:
+            self._socket.close()
+            self._socket = None

@@ -21,7 +21,9 @@ class GestionnaireCategories:
         """
         self._repository = repository
 
-    def creer_categorie(self, identifiant_utilisateur: int, nom: str) -> dict[str, int | str]:
+    def creer_categorie(
+        self, identifiant_utilisateur: int, nom: str
+    ) -> dict[str, int | str]:
         """Créer une catégorie pour un utilisateur.
 
         Args:
@@ -39,7 +41,9 @@ class GestionnaireCategories:
         except sqlite3.IntegrityError as erreur:
             raise ValueError("Cette catégorie existe déjà.") from erreur
 
-    def recuperer_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int) -> dict[str, int | str]:
+    def recuperer_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int
+    ) -> dict[str, int | str]:
         """Récupérer une catégorie appartenant à un utilisateur.
 
         Args:
@@ -52,12 +56,16 @@ class GestionnaireCategories:
         Raises:
             ValueError: Si la catégorie n'existe pas pour cet utilisateur.
         """
-        categorie = self._repository.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
+        categorie = self._repository.recuperer_categorie(
+            identifiant_utilisateur, identifiant_categorie
+        )
         if categorie is None:
             raise ValueError("Catégorie introuvable pour cet utilisateur.")
         return categorie
 
-    def recuperer_categories(self, identifiant_utilisateur: int) -> list[dict[str, int | str]]:
+    def recuperer_categories(
+        self, identifiant_utilisateur: int
+    ) -> list[dict[str, int | str]]:
         """Récupérer les catégories d'un utilisateur.
 
         Args:
@@ -68,7 +76,9 @@ class GestionnaireCategories:
         """
         return self._repository.recuperer_categories(identifiant_utilisateur)
 
-    def modifier_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int, nom: str) -> dict[str, int | str]:
+    def modifier_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int, nom: str
+    ) -> dict[str, int | str]:
         """Modifier le nom d'une catégorie appartenant à un utilisateur.
 
         Args:
@@ -91,7 +101,9 @@ class GestionnaireCategories:
             raise ValueError("Catégorie introuvable pour cet utilisateur.")
         return categorie
 
-    def supprimer_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int) -> None:
+    def supprimer_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int
+    ) -> None:
         """Supprimer une catégorie appartenant à un utilisateur.
 
         Args:
@@ -104,11 +116,15 @@ class GestionnaireCategories:
         Raises:
             ValueError: Si la catégorie n'existe pas pour cet utilisateur.
         """
-        supprimee = self._repository.supprimer_categorie(identifiant_utilisateur, identifiant_categorie)
+        supprimee = self._repository.supprimer_categorie(
+            identifiant_utilisateur, identifiant_categorie
+        )
         if not supprimee:
             raise ValueError("Catégorie introuvable pour cet utilisateur.")
 
-    def creer_sous_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int, nom: str) -> dict[str, int | str]:
+    def creer_sous_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int, nom: str
+    ) -> dict[str, int | str]:
         """Créer une sous-catégorie dans une catégorie de l'utilisateur.
 
         Args:
@@ -131,7 +147,9 @@ class GestionnaireCategories:
         except sqlite3.IntegrityError as erreur:
             raise ValueError("Cette sous-catégorie existe déjà.") from erreur
 
-    def recuperer_sous_categories(self, identifiant_utilisateur: int, identifiant_categorie: int) -> list[dict[str, int | str]]:
+    def recuperer_sous_categories(
+        self, identifiant_utilisateur: int, identifiant_categorie: int
+    ) -> list[dict[str, int | str]]:
         """Récupérer les sous-catégories d'une catégorie de l'utilisateur.
 
         Args:
@@ -147,7 +165,13 @@ class GestionnaireCategories:
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
         return self._repository.recuperer_sous_categories(identifiant_categorie)
 
-    def modifier_sous_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int, identifiant_sous_categorie: int, nom: str) -> dict[str, int | str]:
+    def modifier_sous_categorie(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_categorie: int,
+        identifiant_sous_categorie: int,
+        nom: str,
+    ) -> dict[str, int | str]:
         """Modifier une sous-catégorie d'une catégorie de l'utilisateur.
 
         Args:
@@ -172,7 +196,12 @@ class GestionnaireCategories:
             raise ValueError("Sous-catégorie introuvable pour cette catégorie.")
         return sous_categorie
 
-    def supprimer_sous_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int, identifiant_sous_categorie: int) -> None:
+    def supprimer_sous_categorie(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_categorie: int,
+        identifiant_sous_categorie: int,
+    ) -> None:
         """Supprimer une sous-catégorie d'une catégorie de l'utilisateur.
 
         Args:
@@ -187,7 +216,9 @@ class GestionnaireCategories:
             ValueError: Si la catégorie ou la sous-catégorie est introuvable.
         """
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
-        supprimee = self._repository.supprimer_sous_categorie(identifiant_categorie, identifiant_sous_categorie)
+        supprimee = self._repository.supprimer_sous_categorie(
+            identifiant_categorie, identifiant_sous_categorie
+        )
         if not supprimee:
             raise ValueError("Sous-catégorie introuvable pour cette catégorie.")
 

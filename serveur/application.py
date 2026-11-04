@@ -1,8 +1,7 @@
 """Assemblage des services et routage sécurisé des requêtes du MVP."""
 
-import secrets
 import sqlite3
-from datetime import date
+from collections.abc import Callable
 from typing import Any
 
 from persistance.repositories.budgets import RepositoryBudgets
@@ -12,158 +11,508 @@ from persistance.repositories.objectifs_epargne import RepositoryObjectifsEpargn
 from persistance.repositories.revenus import RepositoryRevenus
 from persistance.repositories.utilisateurs import RepositoryUtilisateurs
 from serveur.communication.serveur_socket import ServeurSocket
+from serveur.securite.sessions import GestionnaireSessions
+from serveur.services.analyse_epargne import AnalyseurEpargne
 from serveur.services.budget import GestionnaireBudget
 from serveur.services.categories import GestionnaireCategories
 from serveur.services.depenses import GestionnaireDepenses
 from serveur.services.objectifs_epargne import GestionnaireObjectifsEpargne
 from serveur.services.revenus import GestionnaireRevenus
+from serveur.services.solde import GestionnaireSolde
 from serveur.services.utilisateurs import GestionnaireUtilisateurs
+
+DonneesRequete = dict[str, Any]
+Traitement = Callable[[DonneesRequete], Any]
 
 
 class ApplicationServeur:
-    """Exposer les services sans accepter d'identifiant utilisateur du client."""
+    """Relier le protocole réseau aux services de l'application.
+
+    Le client transmet uniquement un jeton de session. L'identifiant du
+    propriétaire est toujours résolu côté serveur avant d'appeler un service.
+    """
 
     def __init__(self, connexion: sqlite3.Connection) -> None:
-        self.utilisateurs=GestionnaireUtilisateurs(RepositoryUtilisateurs(connexion))
-        self.categories=GestionnaireCategories(RepositoryCategories(connexion))
-        self.revenus=GestionnaireRevenus(RepositoryRevenus(connexion))
-        self.budgets=GestionnaireBudget(RepositoryBudgets(connexion))
-        self.depenses=GestionnaireDepenses(RepositoryDepenses(connexion))
-        self.objectifs=GestionnaireObjectifsEpargne(RepositoryObjectifsEpargne(connexion))
-        self._sessions: dict[str,int]={}
+        self.utilisateurs = GestionnaireUtilisateurs(RepositoryUtilisateurs(connexion))
+        self.categories = GestionnaireCategories(RepositoryCategories(connexion))
+        self.revenus = GestionnaireRevenus(RepositoryRevenus(connexion))
+        self.budgets = GestionnaireBudget(RepositoryBudgets(connexion))
+        self.depenses = GestionnaireDepenses(RepositoryDepenses(connexion))
+        self.objectifs = GestionnaireObjectifsEpargne(
+            RepositoryObjectifsEpargne(connexion)
+        )
 
-    def traitements(self) -> dict[str, Any]:
-        return {"utilisateurs.creer":self.creer_compte,"utilisateurs.connecter":self.connecter,
-            "utilisateurs.deconnecter":self.deconnecter,
-            "utilisateurs.changer_mot_de_passe":self.changer_mot_de_passe,
-            "utilisateurs.supprimer":self.supprimer_compte,
-            "categories.creer":self.creer_categorie,
-            "categories.lister":self.lister_categories,
-            "sous_categories.creer":self.creer_sous_categorie,
-            "sous_categories.lister":self.lister_sous_categories,
-            "revenus.creer":self.creer_revenu,
-            "revenus.modifier":self.modifier_revenu,"revenus.supprimer":self.supprimer_revenu,
-            "revenus.lister":self.lister_revenus,"budgets.creer":self.creer_budget,
-            "budgets.modifier":self.modifier_budget,"budgets.supprimer":self.supprimer_budget,
-            "budgets.lister":self.lister_budgets,"depenses.creer":self.creer_depense,
-            "depenses.modifier":self.modifier_depense,"depenses.supprimer":self.supprimer_depense,
-            "depenses.lister":self.lister_depenses,"objectifs.creer":self.creer_objectif,
-            "objectifs.lister":self.lister_objectifs,
-            "objectifs.analyser":self.analyser_objectifs,
-            "objectifs.alimenter":self.alimenter_objectif,
-            "objectifs.versements":self.lister_versements,
-            "solde.obtenir":self.obtenir_solde}
+        self.sessions = GestionnaireSessions()
+        self.solde = GestionnaireSolde(
+            self.revenus,
+            self.depenses,
+            self.objectifs,
+        )
+        self.analyseur_epargne = AnalyseurEpargne(
+            self.revenus,
+            self.depenses,
+            self.objectifs,
+        )
 
-    def creer_compte(self, d: dict[str,Any]) -> dict[str,Any]:
-        return self.utilisateurs.creer_compte(d["identifiant"],d["mot_de_passe"])
+    def traitements(self) -> dict[str, Traitement]:
+        """Associer chaque action du protocole à son traitement.
 
-    def connecter(self, d: dict[str,Any]) -> dict[str,Any]:
-        if not self.utilisateurs.authentifier_utilisateur(d["identifiant"],d["mot_de_passe"]):
+        Returns:
+            Les traitements indexés par le nom de leur action JSON.
+        """
+        return {
+            "utilisateurs.creer": self.creer_compte,
+            "utilisateurs.connecter": self.connecter,
+            "utilisateurs.deconnecter": self.deconnecter,
+            "utilisateurs.changer_mot_de_passe": self.changer_mot_de_passe,
+            "utilisateurs.supprimer": self.supprimer_compte,
+            "categories.creer": self.creer_categorie,
+            "categories.lister": self.lister_categories,
+            "sous_categories.creer": self.creer_sous_categorie,
+            "sous_categories.lister": self.lister_sous_categories,
+            "revenus.creer": self.creer_revenu,
+            "revenus.modifier": self.modifier_revenu,
+            "revenus.supprimer": self.supprimer_revenu,
+            "revenus.lister": self.lister_revenus,
+            "budgets.creer": self.creer_budget,
+            "budgets.modifier": self.modifier_budget,
+            "budgets.supprimer": self.supprimer_budget,
+            "budgets.lister": self.lister_budgets,
+            "depenses.creer": self.creer_depense,
+            "depenses.modifier": self.modifier_depense,
+            "depenses.supprimer": self.supprimer_depense,
+            "depenses.lister": self.lister_depenses,
+            "objectifs.creer": self.creer_objectif,
+            "objectifs.lister": self.lister_objectifs,
+            "objectifs.analyser": self.analyser_objectifs,
+            "objectifs.alimenter": self.alimenter_objectif,
+            "objectifs.versements": self.lister_versements,
+            "solde.obtenir": self.obtenir_solde,
+        }
+
+    def creer_compte(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Créer un compte sans ouvrir automatiquement de session.
+
+        Args:
+            donnees: Identifiant et mot de passe du nouveau compte.
+
+        Returns:
+            Le compte créé, sans son mot de passe haché.
+        """
+        return self.utilisateurs.creer_compte(
+            donnees["identifiant"],
+            donnees["mot_de_passe"],
+        )
+
+    def connecter(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Authentifier un utilisateur et ouvrir une session opaque.
+
+        Args:
+            donnees: Identifiant et mot de passe du compte.
+
+        Returns:
+            Le jeton de session et les informations publiques du compte.
+
+        Raises:
+            ValueError: Si les identifiants sont invalides.
+        """
+        identifiant = donnees["identifiant"]
+        mot_de_passe = donnees["mot_de_passe"]
+        if not self.utilisateurs.authentifier_utilisateur(
+            identifiant,
+            mot_de_passe,
+        ):
             raise ValueError("Identifiants invalides.")
-        compte=self.utilisateurs.recuperer_compte(d["identifiant"])
-        jeton=secrets.token_urlsafe(32); self._sessions[jeton]=compte["id"]
-        return {"session":jeton,"utilisateur":compte}
 
-    def deconnecter(self,d): self._sessions.pop(d.get("session",""),None); return None
-    def changer_mot_de_passe(self,d):
-        self.utilisateurs.changer_mot_de_passe(self._id(d),d["ancien"],d["nouveau"])
-        return None
-    def supprimer_compte(self,d):
-        jeton=d.get("session",""); utilisateur_id=self._id(d)
-        self.utilisateurs.supprimer_compte_authentifie(utilisateur_id,d["mot_de_passe"])
-        self._sessions.pop(jeton,None); return None
-    def _id(self,d):
-        try: return self._sessions[d["session"]]
-        except KeyError as erreur: raise ValueError("Session invalide ou expirée.") from erreur
-    def creer_categorie(self,d): return self.categories.creer_categorie(self._id(d),d["nom"])
-    def lister_categories(self,d): return self.categories.recuperer_categories(self._id(d))
-    def creer_sous_categorie(self,d):
-        return self.categories.creer_sous_categorie(self._id(d),d["categorie_id"],d["nom"])
-    def lister_sous_categories(self,d):
-        return self.categories.recuperer_sous_categories(self._id(d),d["categorie_id"])
-    def creer_revenu(self,d): return self.revenus.ajouter_revenu({**d,"utilisateur_id":self._id(d)})
-    def modifier_revenu(self,d): return self.revenus.modifier_revenu(self._id(d),d["id"],d)
-    def supprimer_revenu(self,d): self.revenus.supprimer_revenu(self._id(d),d["id"]); return None
-    def lister_revenus(self,d): return self.revenus.consulter_revenus(self._id(d),d.get("debut"),d.get("fin"),d.get("statut"))
-    def creer_budget(self,d): return self.budgets.creer_budget({**d,"utilisateur_id":self._id(d)})
-    def modifier_budget(self,d): return self.budgets.modifier_budget(self._id(d),d["id"],d)
-    def supprimer_budget(self,d): self.budgets.supprimer_budget(self._id(d),d["id"]); return None
-    def lister_budgets(self,d): return self.budgets.consulter_budget(self._id(d),d.get("annee"),d.get("mois"))
-    def _verifier_solde(self,utilisateur_id: int,donnees: dict[str,Any],
-                        depense_ignoree: int | None=None) -> None:
-        """Refuser une dépense réalisée qui rendrait le solde négatif."""
-        if donnees.get("statut") != "realisee": return
-        try: montant=float(donnees["montant"])
-        except (KeyError,TypeError,ValueError) as erreur:
-            raise ValueError("Le montant de la dépense est invalide.") from erreur
-        depenses=sum(float(x["montant"]) for x in
-                     self.depenses.consulter_depenses(utilisateur_id,"realisee")
-                     if x["id"] != depense_ignoree)
-        revenus=sum(float(x["montant"]) for x in
-                    self.revenus.consulter_revenus(utilisateur_id,statut="recu"))
-        epargne=self.objectifs.total_versements(utilisateur_id)
-        disponible=round(revenus-depenses-epargne,2)
-        if montant > disponible + 1e-9:
-            raise ValueError(
-                f"Solde insuffisant : {disponible:.2f} € disponible(s). "
-                "Une dépense ne peut pas rendre le solde négatif."
-            )
-    def creer_depense(self,d):
-        utilisateur_id=self._id(d); self._verifier_solde(utilisateur_id,d)
-        return self.depenses.ajouter_depense({**d,"utilisateur_id":utilisateur_id})
-    def modifier_depense(self,d):
-        utilisateur_id=self._id(d)
-        existante=next((x for x in self.depenses.consulter_depenses(utilisateur_id)
-                        if x["id"]==d["id"]),None)
-        if existante is None: raise ValueError("Dépense introuvable pour cet utilisateur.")
-        self._verifier_solde(utilisateur_id,d,d["id"])
-        return self.depenses.modifier_depense(utilisateur_id,d["id"],d)
-    def supprimer_depense(self,d): self.depenses.supprimer_depense(self._id(d),d["id"]); return None
-    def lister_depenses(self,d): return self.depenses.consulter_depenses(self._id(d),d.get("statut"))
-    def creer_objectif(self,d): return self.objectifs.creer_objectif({**d,"utilisateur_id":self._id(d)})
-    def lister_objectifs(self,d): return self.objectifs.consulter_objectifs(self._id(d))
-    def lister_versements(self,d):
-        return self.objectifs.consulter_versements(self._id(d),d.get("objectif_id"))
-    def obtenir_solde(self,d):
-        utilisateur_id=self._id(d)
-        revenus=sum(float(x["montant"]) for x in
-                    self.revenus.consulter_revenus(utilisateur_id,statut="recu"))
-        depenses=sum(float(x["montant"]) for x in
-                     self.depenses.consulter_depenses(utilisateur_id,"realisee"))
-        epargne=self.objectifs.total_versements(utilisateur_id)
-        return {"revenus":round(revenus,2),"depenses":round(depenses,2),
-                "epargne":round(epargne,2),"disponible":round(revenus-depenses-epargne,2)}
-    def alimenter_objectif(self,d):
-        utilisateur_id=self._id(d); montant=float(d["montant"])
-        disponible=self.obtenir_solde(d)["disponible"]
-        if montant > disponible + 1e-9:
-            raise ValueError(f"Solde insuffisant : {disponible:.2f} € disponible(s).")
+        compte = self.utilisateurs.recuperer_compte(identifiant)
+        jeton = self.sessions.ouvrir(compte["id"])
+        return {"session": jeton, "utilisateur": compte}
+
+    def deconnecter(self, donnees: DonneesRequete) -> None:
+        """Fermer la session transmise par le client.
+
+        Args:
+            donnees: Données contenant éventuellement le jeton de session.
+        """
+        self.sessions.fermer(donnees.get("session"))
+
+    def changer_mot_de_passe(self, donnees: DonneesRequete) -> None:
+        """Changer le mot de passe de l'utilisateur authentifié.
+
+        Args:
+            donnees: Session, ancien mot de passe et nouveau mot de passe.
+
+        Raises:
+            ValueError: Si la session ou les mots de passe sont invalides.
+        """
+        self.utilisateurs.changer_mot_de_passe(
+            self._identifiant_utilisateur(donnees),
+            donnees["ancien"],
+            donnees["nouveau"],
+        )
+
+    def supprimer_compte(self, donnees: DonneesRequete) -> None:
+        """Supprimer un compte après vérification du mot de passe.
+
+        Args:
+            donnees: Session et mot de passe de confirmation.
+
+        Raises:
+            ValueError: Si la session ou le mot de passe est invalide.
+        """
+        jeton = donnees.get("session")
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        self.utilisateurs.supprimer_compte_authentifie(
+            identifiant_utilisateur,
+            donnees["mot_de_passe"],
+        )
+        self.sessions.fermer(jeton)
+
+    def creer_categorie(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Créer une catégorie pour l'utilisateur authentifié.
+
+        Args:
+            donnees: Session et nom de la catégorie.
+
+        Returns:
+            La catégorie créée.
+        """
+        return self.categories.creer_categorie(
+            self._identifiant_utilisateur(donnees),
+            donnees["nom"],
+        )
+
+    def lister_categories(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les catégories de l'utilisateur authentifié.
+
+        Args:
+            donnees: Données contenant le jeton de session.
+
+        Returns:
+            Les catégories appartenant à l'utilisateur.
+        """
+        return self.categories.recuperer_categories(
+            self._identifiant_utilisateur(donnees)
+        )
+
+    def creer_sous_categorie(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Créer une sous-catégorie dans une catégorie accessible.
+
+        Args:
+            donnees: Session, catégorie parente et nom de la sous-catégorie.
+
+        Returns:
+            La sous-catégorie créée.
+        """
+        return self.categories.creer_sous_categorie(
+            self._identifiant_utilisateur(donnees),
+            donnees["categorie_id"],
+            donnees["nom"],
+        )
+
+    def lister_sous_categories(
+        self,
+        donnees: DonneesRequete,
+    ) -> list[dict[str, Any]]:
+        """Lister les sous-catégories d'une catégorie accessible.
+
+        Args:
+            donnees: Session et identifiant de la catégorie parente.
+
+        Returns:
+            Les sous-catégories de la catégorie.
+        """
+        return self.categories.recuperer_sous_categories(
+            self._identifiant_utilisateur(donnees),
+            donnees["categorie_id"],
+        )
+
+    def creer_revenu(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Créer un revenu pour l'utilisateur authentifié.
+
+        Args:
+            donnees: Session et informations du revenu.
+
+        Returns:
+            Le revenu créé.
+        """
+        return self.revenus.ajouter_revenu(
+            {
+                **donnees,
+                "utilisateur_id": self._identifiant_utilisateur(donnees),
+            }
+        )
+
+    def modifier_revenu(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Modifier un revenu accessible à l'utilisateur authentifié.
+
+        Args:
+            donnees: Session, identifiant et nouvelles valeurs du revenu.
+
+        Returns:
+            Le revenu modifié.
+        """
+        return self.revenus.modifier_revenu(
+            self._identifiant_utilisateur(donnees),
+            donnees["id"],
+            donnees,
+        )
+
+    def supprimer_revenu(self, donnees: DonneesRequete) -> None:
+        """Supprimer un revenu accessible à l'utilisateur authentifié.
+
+        Args:
+            donnees: Session et identifiant du revenu.
+        """
+        self.revenus.supprimer_revenu(
+            self._identifiant_utilisateur(donnees),
+            donnees["id"],
+        )
+
+    def lister_revenus(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les revenus selon les filtres transmis.
+
+        Args:
+            donnees: Session et filtres facultatifs de période et de statut.
+
+        Returns:
+            Les revenus correspondant aux filtres.
+        """
+        return self.revenus.consulter_revenus(
+            self._identifiant_utilisateur(donnees),
+            donnees.get("debut"),
+            donnees.get("fin"),
+            donnees.get("statut"),
+        )
+
+    def creer_budget(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Créer une allocation budgétaire mensuelle.
+
+        Args:
+            donnees: Session et informations de l'allocation.
+
+        Returns:
+            Le budget créé.
+        """
+        return self.budgets.creer_budget(
+            {
+                **donnees,
+                "utilisateur_id": self._identifiant_utilisateur(donnees),
+            }
+        )
+
+    def modifier_budget(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Modifier une allocation budgétaire accessible.
+
+        Args:
+            donnees: Session, identifiant et nouvelles valeurs du budget.
+
+        Returns:
+            Le budget modifié.
+        """
+        return self.budgets.modifier_budget(
+            self._identifiant_utilisateur(donnees),
+            donnees["id"],
+            donnees,
+        )
+
+    def supprimer_budget(self, donnees: DonneesRequete) -> None:
+        """Supprimer une allocation budgétaire accessible.
+
+        Args:
+            donnees: Session et identifiant du budget.
+        """
+        self.budgets.supprimer_budget(
+            self._identifiant_utilisateur(donnees),
+            donnees["id"],
+        )
+
+    def lister_budgets(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les budgets selon la période transmise.
+
+        Args:
+            donnees: Session, année et mois facultatifs.
+
+        Returns:
+            Les budgets correspondant à la période.
+        """
+        return self.budgets.consulter_budget(
+            self._identifiant_utilisateur(donnees),
+            donnees.get("annee"),
+            donnees.get("mois"),
+        )
+
+    def creer_depense(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Valider le solde puis créer une dépense.
+
+        Args:
+            donnees: Session et informations de la dépense.
+
+        Returns:
+            La dépense créée.
+
+        Raises:
+            ValueError: Si la dépense dépasse le solde disponible.
+        """
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        self.solde.verifier_depense(identifiant_utilisateur, donnees)
+        return self.depenses.ajouter_depense(
+            {**donnees, "utilisateur_id": identifiant_utilisateur}
+        )
+
+    def modifier_depense(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Valider le solde puis modifier une dépense accessible.
+
+        Args:
+            donnees: Session, identifiant et nouvelles valeurs de la dépense.
+
+        Returns:
+            La dépense modifiée.
+
+        Raises:
+            ValueError: Si la dépense est inaccessible ou dépasse le solde.
+        """
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        identifiant_depense = donnees["id"]
+        depenses = self.depenses.consulter_depenses(identifiant_utilisateur)
+        if not any(depense["id"] == identifiant_depense for depense in depenses):
+            raise ValueError("Dépense introuvable pour cet utilisateur.")
+
+        self.solde.verifier_depense(
+            identifiant_utilisateur,
+            donnees,
+            identifiant_depense,
+        )
+        return self.depenses.modifier_depense(
+            identifiant_utilisateur,
+            identifiant_depense,
+            donnees,
+        )
+
+    def supprimer_depense(self, donnees: DonneesRequete) -> None:
+        """Supprimer une dépense accessible.
+
+        Args:
+            donnees: Session et identifiant de la dépense.
+        """
+        self.depenses.supprimer_depense(
+            self._identifiant_utilisateur(donnees),
+            donnees["id"],
+        )
+
+    def lister_depenses(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les dépenses selon leur statut.
+
+        Args:
+            donnees: Session et statut facultatif des dépenses.
+
+        Returns:
+            Les dépenses correspondant au filtre.
+        """
+        return self.depenses.consulter_depenses(
+            self._identifiant_utilisateur(donnees),
+            donnees.get("statut"),
+        )
+
+    def creer_objectif(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Créer un objectif d'épargne.
+
+        Args:
+            donnees: Session et informations de l'objectif.
+
+        Returns:
+            L'objectif créé.
+        """
+        return self.objectifs.creer_objectif(
+            {
+                **donnees,
+                "utilisateur_id": self._identifiant_utilisateur(donnees),
+            }
+        )
+
+    def lister_objectifs(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les objectifs d'épargne accessibles.
+
+        Args:
+            donnees: Données contenant le jeton de session.
+
+        Returns:
+            Les objectifs de l'utilisateur.
+        """
+        return self.objectifs.consulter_objectifs(
+            self._identifiant_utilisateur(donnees)
+        )
+
+    def lister_versements(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les versements d'épargne accessibles.
+
+        Args:
+            donnees: Session et objectif facultatif à filtrer.
+
+        Returns:
+            Les versements correspondant au filtre.
+        """
+        return self.objectifs.consulter_versements(
+            self._identifiant_utilisateur(donnees),
+            donnees.get("objectif_id"),
+        )
+
+    def obtenir_solde(self, donnees: DonneesRequete) -> dict[str, float]:
+        """Retourner le solde de l'utilisateur authentifié.
+
+        Args:
+            donnees: Données contenant le jeton de session.
+
+        Returns:
+            Les totaux des revenus, dépenses, épargne et solde disponible.
+        """
+        return self.solde.obtenir(self._identifiant_utilisateur(donnees))
+
+    def alimenter_objectif(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Valider le solde puis enregistrer un versement d'épargne.
+
+        Args:
+            donnees: Session, objectif, montant et date du versement.
+
+        Returns:
+            Le versement créé.
+
+        Raises:
+            ValueError: Si le versement dépasse le solde disponible.
+        """
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        montant = float(donnees["montant"])
+        self.solde.verifier_versement(identifiant_utilisateur, montant)
         return self.objectifs.alimenter_objectif(
-            utilisateur_id,d["objectif_id"],montant,d["date"]
+            identifiant_utilisateur,
+            donnees["objectif_id"],
+            montant,
+            donnees["date"],
         )
-    def analyser_objectifs(self,d):
-        utilisateur_id=self._id(d); aujourd_hui=date.today()
-        debut=aujourd_hui.replace(day=1).isoformat()
-        revenus=self.revenus.consulter_revenus(utilisateur_id,debut,aujourd_hui.isoformat(),"recu")
-        depenses=self.depenses.consulter_depenses(utilisateur_id,"realisee")
-        depenses=[x for x in depenses if debut <= x["date"] <= aujourd_hui.isoformat()]
-        revenu_mois=sum(float(x["montant"]) for x in revenus)
-        depense_mois=sum(float(x["montant"]) for x in depenses)
-        versements_mois=self.objectifs.total_versements(
-            utilisateur_id,debut,aujourd_hui.isoformat()
-        )
-        epargne_maximale=max(0.0,revenu_mois-depense_mois-versements_mois)
-        analyses=[]
-        for objectif in self.objectifs.consulter_objectifs(utilisateur_id):
-            plan=self.objectifs.determiner_plan_epargne({**objectif,"utilisateur_id":utilisateur_id})
-            requise=float(plan["montant_periodique_recommande"])
-            analyses.append({**objectif,**plan,"revenus_mois":round(revenu_mois,2),
-                "depenses_mois":round(depense_mois,2),"versements_mois":round(versements_mois,2),
-                "epargne_maximale":round(epargne_maximale,2),
-                "revenu_utilisable":round(max(0.0,revenu_mois-requise),2),
-                "objectif_atteignable":requise <= epargne_maximale})
-        return analyses
+
+    def analyser_objectifs(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Retourner l'analyse mensuelle des objectifs d'épargne.
+
+        Args:
+            donnees: Données contenant le jeton de session.
+
+        Returns:
+            Les objectifs enrichis de leurs indicateurs mensuels.
+        """
+        return self.analyseur_epargne.analyser(self._identifiant_utilisateur(donnees))
+
+    def _identifiant_utilisateur(self, donnees: DonneesRequete) -> int:
+        """Résoudre le propriétaire à partir du jeton de session."""
+        return self.sessions.identifier(donnees.get("session"))
 
 
 def construire_serveur(connexion: sqlite3.Connection) -> ServeurSocket:
+    """Construire le serveur réseau avec tous les traitements du MVP.
+
+    Args:
+        connexion: Connexion SQLite partagée par les repositories.
+
+    Returns:
+        Le serveur configuré avec les actions de l'application.
+    """
     return ServeurSocket(ApplicationServeur(connexion).traitements())

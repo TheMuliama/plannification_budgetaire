@@ -4,7 +4,6 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from argon2.low_level import Type
 
-
 _hacheur = PasswordHasher(type=Type.ID)
 
 

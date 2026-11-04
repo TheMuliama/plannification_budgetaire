@@ -1,8 +1,9 @@
 """Service de gestion des dépenses."""
 
-from typing import Any
 from datetime import date
 from math import isfinite
+from typing import Any
+
 from persistance.repositories.depenses import RepositoryDepenses
 
 
@@ -27,8 +28,12 @@ class GestionnaireDepenses:
         """
         return self._repository.ajouter_depense(**self._valider(depense))
 
-    def modifier_depense(self, identifiant_utilisateur: int, identifiant_depense: int,
-                         depense: dict[str, Any]) -> dict[str, Any]:
+    def modifier_depense(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_depense: int,
+        depense: dict[str, Any],
+    ) -> dict[str, Any]:
         """Modifier une dépense existante.
 
         Args:
@@ -39,12 +44,18 @@ class GestionnaireDepenses:
             La dépense modifiée.
         """
         donnees = self._valider({**depense, "utilisateur_id": identifiant_utilisateur})
-        resultat = self._repository.modifier_depense(identifiant_utilisateur, identifiant_depense,
-            **{c: v for c, v in donnees.items() if c != "utilisateur_id"})
-        if resultat is None: raise ValueError("Dépense introuvable pour cet utilisateur.")
+        resultat = self._repository.modifier_depense(
+            identifiant_utilisateur,
+            identifiant_depense,
+            **{c: v for c, v in donnees.items() if c != "utilisateur_id"},
+        )
+        if resultat is None:
+            raise ValueError("Dépense introuvable pour cet utilisateur.")
         return resultat
 
-    def supprimer_depense(self, identifiant_utilisateur: int, identifiant_depense: int) -> None:
+    def supprimer_depense(
+        self, identifiant_utilisateur: int, identifiant_depense: int
+    ) -> None:
         """Supprimer une dépense.
 
         Args:
@@ -53,11 +64,14 @@ class GestionnaireDepenses:
         Returns:
             None.
         """
-        if not self._repository.supprimer_depense(identifiant_utilisateur, identifiant_depense):
+        if not self._repository.supprimer_depense(
+            identifiant_utilisateur, identifiant_depense
+        ):
             raise ValueError("Dépense introuvable pour cet utilisateur.")
 
-    def consulter_depenses(self, identifiant_utilisateur: int,
-                           statut: str | None = None) -> list[dict[str, Any]]:
+    def consulter_depenses(
+        self, identifiant_utilisateur: int, statut: str | None = None
+    ) -> list[dict[str, Any]]:
         """Consulter l'historique des dépenses d'un utilisateur.
 
         Args:
@@ -73,20 +87,32 @@ class GestionnaireDepenses:
     @staticmethod
     def _valider(depense: dict[str, Any]) -> dict[str, Any]:
         try:
-            resultat = {"utilisateur_id": int(depense["utilisateur_id"]),
-                "budget_id": int(depense["budget_id"]), "categorie_id": int(depense["categorie_id"]),
-                "sous_categorie_id": None if depense.get("sous_categorie_id") is None else int(depense["sous_categorie_id"]),
-                "montant": float(depense["montant"]), "date": depense["date"],
-                "description": depense.get("description"), "statut": depense["statut"]}
+            resultat = {
+                "utilisateur_id": int(depense["utilisateur_id"]),
+                "budget_id": int(depense["budget_id"]),
+                "categorie_id": int(depense["categorie_id"]),
+                "sous_categorie_id": None
+                if depense.get("sous_categorie_id") is None
+                else int(depense["sous_categorie_id"]),
+                "montant": float(depense["montant"]),
+                "date": depense["date"],
+                "description": depense.get("description"),
+                "statut": depense["statut"],
+            }
         except (KeyError, TypeError, ValueError) as erreur:
             raise ValueError("Informations de dépense incomplètes.") from erreur
-        if any(resultat[c] <= 0 for c in ("utilisateur_id","budget_id","categorie_id")):
+        if any(
+            resultat[c] <= 0 for c in ("utilisateur_id", "budget_id", "categorie_id")
+        ):
             raise ValueError("Les identifiants de la dépense sont invalides.")
         if not isfinite(resultat["montant"]) or resultat["montant"] <= 0:
             raise ValueError("Le montant doit être strictement positif.")
-        try: date.fromisoformat(resultat["date"])
-        except (TypeError, ValueError) as erreur: raise ValueError("Date de dépense invalide.") from erreur
-        if resultat["statut"] not in {"prevue","realisee"}: raise ValueError("Statut de dépense invalide.")
+        try:
+            date.fromisoformat(resultat["date"])
+        except (TypeError, ValueError) as erreur:
+            raise ValueError("Date de dépense invalide.") from erreur
+        if resultat["statut"] not in {"prevue", "realisee"}:
+            raise ValueError("Statut de dépense invalide.")
         if resultat["description"] is not None:
             resultat["description"] = str(resultat["description"]).strip() or None
         return resultat

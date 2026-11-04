@@ -13,16 +13,22 @@ def main() -> None:
     Returns:
         None.
     """
-    analyseur=argparse.ArgumentParser(description="Serveur de planification budgétaire")
-    analyseur.add_argument("--base",default="persistance/data/budget.db")
-    analyseur.add_argument("--adresse",default="127.0.0.1")
-    analyseur.add_argument("--port",type=int,default=8765)
-    options=analyseur.parse_args()
-    chemin=Path(options.base); chemin.parent.mkdir(parents=True,exist_ok=True)
-    base=Database(); connexion=base.connecter(str(chemin))
+    analyseur = argparse.ArgumentParser(
+        description="Serveur de planification budgétaire"
+    )
+    analyseur.add_argument("--base", default="persistance/data/budget.db")
+    analyseur.add_argument("--adresse", default="127.0.0.1")
+    analyseur.add_argument("--port", type=int, default=8765)
+    options = analyseur.parse_args()
+    chemin = Path(options.base)
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    base = Database()
+    connexion = base.connecter(str(chemin))
     base.initialiser_schema(connexion)
-    try: construire_serveur(connexion).demarrer(options.port,options.adresse)
-    finally: connexion.close()
+    try:
+        construire_serveur(connexion).demarrer(options.port, options.adresse)
+    finally:
+        connexion.close()
 
 
 if __name__ == "__main__":

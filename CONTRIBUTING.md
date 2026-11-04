@@ -141,7 +141,7 @@ Le corps explique notamment les choix et leurs conséquences. Les types supplém
 - Ajouter des tests pertinents pour les nouveaux comportements et les corrections de bugs.
 - Pour les calculs budgétaires, vérifier les valeurs nulles, les limites, les arrondis et les totaux.
 - Pour les données par utilisateur, vérifier qu'un utilisateur ne peut pas consulter ou modifier celles d'un autre.
-- Utiliser des données fictives et une base de test isolée. Ne pas publier de mots de passe, de factures réelles ou de données financières personnelles, notamment dans `persistance/data/`.
+- Utiliser des données fictives et une base de test isolée. Ne pas publier de mots de passe, de documents financiers réels ou de données personnelles, notamment dans `persistance/data/`.
 - Documenter les changements de schéma et la procédure de migration lorsqu'elle est nécessaire.
 
 Depuis la racine du dépôt, préparer un environnement local sous Linux :
