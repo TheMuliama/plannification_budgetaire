@@ -81,7 +81,7 @@ class TableauDeBord(ctk.CTkFrame):
         self.valeurs = {}
         for col, (cle, titre) in enumerate([
             ("budget_mois", "Budget du mois"), ("depense", "Dépensé"),
-            ("restant", "Restant"), ("alertes_actives", "Alertes actives")
+            ("restant", "Solde disponible"), ("alertes_actives", "Alertes actives")
         ]):
             indicateurs.grid_columnconfigure(col, weight=1, uniform="indicateurs")
             carte = self._carte(indicateurs)

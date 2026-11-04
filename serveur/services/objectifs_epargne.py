@@ -73,6 +73,31 @@ class GestionnaireObjectifsEpargne:
     def consulter_objectifs(self, identifiant_utilisateur: int) -> list[dict[str, Any]]:
         return self._repository.consulter_objectifs(identifiant_utilisateur)
 
+    def alimenter_objectif(self, identifiant_utilisateur: int, identifiant_objectif: int,
+                           montant: float, date_versement: str) -> dict[str, Any]:
+        """Verser une somme positive sur un objectif appartenant à l'utilisateur."""
+        try:
+            valeur=float(montant); jour=date.fromisoformat(date_versement)
+        except (TypeError,ValueError) as erreur:
+            raise ValueError("Le versement ou sa date est invalide.") from erreur
+        if not isfinite(valeur) or valeur <= 0:
+            raise ValueError("Le versement doit être strictement positif.")
+        if jour > date.today():
+            raise ValueError("Un versement ne peut pas être daté dans le futur.")
+        return self._repository.ajouter_versement(
+            identifiant_utilisateur,identifiant_objectif,valeur,date_versement
+        )
+
+    def consulter_versements(self, identifiant_utilisateur: int,
+                             identifiant_objectif: int | None=None) -> list[dict[str, Any]]:
+        return self._repository.consulter_versements(
+            identifiant_utilisateur,identifiant_objectif
+        )
+
+    def total_versements(self, identifiant_utilisateur: int, debut: str | None=None,
+                         fin: str | None=None) -> float:
+        return self._repository.total_versements(identifiant_utilisateur,debut,fin)
+
     def determiner_plan_epargne(self, objectif: dict[str, Any]) -> dict[str, Any]:
         """Déterminer le plan d'épargne associé à un objectif.
 
@@ -139,4 +164,6 @@ class GestionnaireObjectifsEpargne:
             raise ValueError("Le propriétaire ou la cible est invalide.")
         if any(not isfinite(resultat[c]) or resultat[c]<0 for c in ("montant_actuel","montant_periodique")):
             raise ValueError("Les montants de l'objectif sont invalides.")
+        if resultat["montant_actuel"] > resultat["montant_cible"]:
+            raise ValueError("Le montant épargné ne peut pas dépasser la cible.")
         return resultat

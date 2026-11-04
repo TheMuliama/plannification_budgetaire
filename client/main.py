@@ -50,6 +50,7 @@ class ApplicationMonBudget(ctk.CTk):
         self.api = ApiClient()
         self.categories = []
         self.sous_categories = []
+        self.solde = {"revenus":0,"depenses":0,"epargne":0,"disponible":0}
 
         # État de l'interface
         self.page_actuelle = None
@@ -141,6 +142,7 @@ class ApplicationMonBudget(ctk.CTk):
             )
         revenus=self.api.appeler("revenus.lister")
         depenses=self.api.appeler("depenses.lister")
+        self.solde=self.api.appeler("solde.obtenir")
         self.transactions=[{"id":f"revenu:{r['id']}","type":"Revenu",
             "libelle":r.get("description") or "Revenu","montant":Decimal(str(r["montant"])),
             "categorie":r.get("categorie","Salaire"),
@@ -218,7 +220,7 @@ class ApplicationMonBudget(ctk.CTk):
             ("Tableau de bord", "dashboard"),
             ("Transactions", "transactions"),
             ("Budgets", "budgets"),
-            ("Épargne & projection", "objectifs"),
+            ("Épargne", "objectifs"),
             ("Alertes", "alertes"),
             ("Paramètres", "parametres")
         ]
@@ -373,8 +375,8 @@ class ApplicationMonBudget(ctk.CTk):
             Decimal("0")
         )
 
-        # Budget restant
-        restant = budget_total - total_depenses
+        # Solde réellement disponible après dépenses et versements d'épargne
+        restant = Decimal(str(self.solde.get("disponible", 0)))
 
         # Répartition par catégorie
         repartition_categories = defaultdict(
@@ -541,8 +543,8 @@ class ApplicationMonBudget(ctk.CTk):
         self.actualiser_budgets()
 
     def afficher_objectifs(self):
-        """Afficher les objectifs d'épargne et le simulateur."""
-        self.vue=VueObjectifs(self.contenu,self.ajouter_objectif,self.simuler_depense)
+        """Afficher les objectifs et leurs versements d'épargne."""
+        self.vue=VueObjectifs(self.contenu,self.ajouter_objectif,self.alimenter_objectif)
         self.vue.pack(fill="both",expand=True)
         self.vue.actualiser(self.api.appeler("objectifs.analyser"))
 
@@ -552,10 +554,14 @@ class ApplicationMonBudget(ctk.CTk):
         if self.page_actuelle=="objectifs":
             self.vue.actualiser(self.api.appeler("objectifs.analyser"))
 
-    def simuler_depense(self, montant):
-        """Projeter l'impact d'une dépense sans la persister."""
-        if montant <= 0: raise ValueError("Le montant doit être supérieur à zéro.")
-        return self.api.appeler("projection.simuler",montant=montant)
+    def alimenter_objectif(self, objectif_id, montant, date_versement):
+        """Verser une partie du solde sur un objectif puis rafraîchir les calculs."""
+        self.api.appeler(
+            "objectifs.alimenter",objectif_id=objectif_id,montant=montant,date=date_versement
+        )
+        self.charger_donnees()
+        if self.page_actuelle=="objectifs":
+            self.vue.actualiser(self.api.appeler("objectifs.analyser"))
 
     def afficher_parametres(self):
         """Afficher les paramètres."""
@@ -603,13 +609,7 @@ class ApplicationMonBudget(ctk.CTk):
             occurrences_realisees=sum(
                 1 for occurrence in occurrences if occurrence <= datetime.now().date()
             )
-            solde=sum(
-                (Decimal(str(t["montant"])) for t in self.transactions
-                 if t["type"]=="Revenu" and t.get("statut")=="recu"),Decimal("0")
-            )-sum(
-                (Decimal(str(t["montant"])) for t in self.transactions
-                 if t["type"]=="Dépense" and t.get("statut")=="realisee"),Decimal("0")
-            )
+            solde=Decimal(str(self.solde["disponible"]))
             total_immediat=donnees["montant"]*occurrences_realisees
             if total_immediat > solde:
                 raise ValueError(
@@ -669,30 +669,10 @@ class ApplicationMonBudget(ctk.CTk):
         if self.page_actuelle != "transactions":
             return
 
-        revenus = sum(
-            (
-                Decimal(str(t["montant"]))
-                for t in self.transactions
-                if t["type"] == "Revenu"
-                and t.get("statut") == "recu"
-            ),
-            Decimal("0")
-        )
-
-        depenses = sum(
-            (
-                Decimal(str(t["montant"]))
-                for t in self.transactions
-                if t["type"] == "Dépense"
-                and t.get("statut") == "realisee"
-            ),
-            Decimal("0")
-        )
-
         resume = {
-            "revenus": revenus,
-            "depenses": depenses,
-            "solde": revenus - depenses
+            "revenus": Decimal(str(self.solde["revenus"])),
+            "depenses": Decimal(str(self.solde["depenses"])),
+            "solde": Decimal(str(self.solde["disponible"]))
         }
 
         maintenant = datetime.now()

@@ -1,4 +1,4 @@
-"""Écran des objectifs d'épargne et de la projection budgétaire."""
+"""Écran des objectifs et versements d'épargne."""
 
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -21,10 +21,10 @@ class VueObjectifs(ctk.CTkFrame):
     BORDURE = "#E5E5E5"
     ROUGE = "#C94C4C"
 
-    def __init__(self, master, on_ajouter, on_simuler):
+    def __init__(self, master, on_ajouter, on_alimenter):
         super().__init__(master, fg_color=self.FOND)
         self.on_ajouter = on_ajouter
-        self.on_simuler = on_simuler
+        self.on_alimenter = on_alimenter
         self.champs = {}
         self._construire_interface()
 
@@ -33,12 +33,12 @@ class VueObjectifs(ctk.CTkFrame):
         zone.pack(fill="both", expand=True, padx=25, pady=20)
 
         ctk.CTkLabel(
-            zone, text="Épargne et projection", font=("Arial", 26, "bold"),
+            zone, text="Épargne", font=("Arial", 26, "bold"),
             text_color=self.TEXTE,
         ).pack(anchor="w")
         ctk.CTkLabel(
             zone,
-            text="Planifiez vos objectifs et mesurez l'impact d'une dépense avant de la réaliser.",
+            text="Planifiez vos objectifs et alimentez-les avec votre solde disponible.",
             text_color=self.SECONDAIRE,
         ).pack(anchor="w", pady=(3, 16))
 
@@ -75,32 +75,6 @@ class VueObjectifs(ctk.CTkFrame):
         self.message = ctk.CTkLabel(formulaire, text="", text_color=self.ROUGE)
         self.message.grid(row=4, column=0, columnspan=2, sticky="w", padx=18, pady=(0, 12))
 
-        projection = self._carte(zone)
-        projection.pack(fill="x", pady=(0, 15))
-        ctk.CTkLabel(
-            projection, text="Simuler une dépense", font=("Arial", 17, "bold"),
-            text_color=self.TEXTE,
-        ).pack(anchor="w", padx=18, pady=(16, 2))
-        ctk.CTkLabel(
-            projection,
-            text="Cette simulation ne crée aucune transaction et utilise les budgets du mois courant.",
-            text_color=self.SECONDAIRE,
-        ).pack(anchor="w", padx=18, pady=(0, 10))
-        ligne_projection = ctk.CTkFrame(projection, fg_color="transparent")
-        ligne_projection.pack(fill="x", padx=18, pady=(0, 16))
-        self.montant_projection = ctk.CTkEntry(
-            ligne_projection, placeholder_text="Montant de la dépense (€)", width=250, height=40
-        )
-        self.montant_projection.pack(side="left")
-        ctk.CTkButton(
-            ligne_projection, text="Simuler l'impact", height=40, fg_color=self.VERT,
-            hover_color=self.VERT_FONCE, command=self._simuler,
-        ).pack(side="left", padx=10)
-        self.resultat = ctk.CTkLabel(
-            ligne_projection, text="", text_color=self.TEXTE, font=("Arial", 13, "bold")
-        )
-        self.resultat.pack(side="left", padx=10)
-
         ctk.CTkLabel(
             zone, text="Mes objectifs", font=("Arial", 18, "bold"), text_color=self.TEXTE
         ).pack(anchor="w", pady=(2, 8))
@@ -122,14 +96,17 @@ class VueObjectifs(ctk.CTkFrame):
         self.champs[cle] = champ
 
     def _ouvrir_calendrier(self):
+        self._ouvrir_calendrier_pour(self.champs["date_cible"], "Choisir une date cible")
+
+    def _ouvrir_calendrier_pour(self, champ, titre):
         fenetre = ctk.CTkToplevel(self)
-        fenetre.title("Choisir une date cible")
+        fenetre.title(titre)
         fenetre.resizable(False, False)
         fenetre.transient(self.winfo_toplevel())
         centrer_fenetre(fenetre, self.winfo_toplevel(), 300, 300)
         fenetre.grab_set()
         try:
-            initiale = datetime.strptime(self.champs["date_cible"].get().strip(), "%d/%m/%Y")
+            initiale = datetime.strptime(champ.get().strip(), "%d/%m/%Y")
         except ValueError:
             initiale = datetime.now()
         calendrier = Calendar(
@@ -141,8 +118,8 @@ class VueObjectifs(ctk.CTkFrame):
         calendrier.pack(padx=16, pady=(16, 10))
 
         def choisir():
-            self.champs["date_cible"].delete(0, "end")
-            self.champs["date_cible"].insert(0, calendrier.get_date())
+            champ.delete(0, "end")
+            champ.insert(0, calendrier.get_date())
             fenetre.destroy()
 
         ctk.CTkButton(
@@ -184,19 +161,46 @@ class VueObjectifs(ctk.CTkFrame):
         except (ValueError, ConnectionError, OSError) as erreur:
             self.message.configure(text=str(erreur))
 
-    def _simuler(self):
-        try:
-            montant = self._montant(self.montant_projection, obligatoire=True)
-            resultat = self.on_simuler(montant)
-            restant = resultat["budget_restant_projete"]
-            texte = f"Budget restant projeté : {restant:,.2f} €"
-            self.resultat.configure(
-                text=texte.replace(",", " ").replace(".", ","),
-                text_color=self.ROUGE if restant < 0 else self.VERT,
-            )
-            self.message.configure(text="")
-        except (ValueError, ConnectionError, OSError) as erreur:
-            self.message.configure(text=str(erreur))
+    def _ouvrir_versement(self, objectif):
+        fenetre=ctk.CTkToplevel(self)
+        fenetre.title("Ajouter de l'argent")
+        fenetre.resizable(False,False)
+        fenetre.transient(self.winfo_toplevel())
+        centrer_fenetre(fenetre,self.winfo_toplevel(),420,330)
+        fenetre.grab_set()
+        ctk.CTkLabel(
+            fenetre,text=f"Alimenter « {objectif['nom']} »",font=("Arial",20,"bold"),
+            text_color=self.TEXTE,
+        ).pack(pady=(25,18))
+        montant=ctk.CTkEntry(fenetre,width=320,height=40,placeholder_text="Montant du versement (€)")
+        montant.pack(pady=7)
+        zone_date=ctk.CTkFrame(fenetre,fg_color="transparent")
+        zone_date.pack(pady=7)
+        champ_date=ctk.CTkEntry(zone_date,width=270,height=40,placeholder_text="Date (JJ/MM/AAAA)")
+        champ_date.insert(0,datetime.now().strftime("%d/%m/%Y")); champ_date.pack(side="left")
+        ctk.CTkButton(
+            zone_date,text="📅",width=40,height=40,fg_color="#E8F2EE",text_color=self.VERT,
+            hover_color="#D6E9E1",
+            command=lambda:self._ouvrir_calendrier_pour(champ_date,"Date du versement"),
+        ).pack(side="left",padx=(8,0))
+        message=ctk.CTkLabel(fenetre,text="",text_color=self.ROUGE,wraplength=340)
+        message.pack(pady=4)
+
+        def valider():
+            try:
+                valeur=self._montant(montant,obligatoire=True)
+                date_versement=datetime.strptime(champ_date.get().strip(),"%d/%m/%Y").date()
+                if date_versement > datetime.now().date():
+                    raise ValueError("Un versement ne peut pas être daté dans le futur.")
+                self.on_alimenter(objectif["id"],valeur,date_versement.isoformat())
+            except (ValueError,ConnectionError,OSError) as erreur:
+                message.configure(text=str(erreur)); return
+            fenetre.destroy()
+
+        ctk.CTkButton(
+            fenetre,text="Ajouter à l'épargne",width=320,height=42,fg_color=self.VERT,
+            hover_color=self.VERT_FONCE,command=valider,
+        ).pack(pady=8)
 
     def actualiser(self, objectifs):
         for widget in self.liste.winfo_children():
@@ -212,9 +216,17 @@ class VueObjectifs(ctk.CTkFrame):
             actuel = float(objectif["montant_actuel"])
             cible = float(objectif["montant_cible"])
             progression = min(1.0, actuel / cible if cible else 0.0)
+            entete=ctk.CTkFrame(carte,fg_color="transparent")
+            entete.pack(fill="x",padx=16,pady=(12,2))
             ctk.CTkLabel(
-                carte, text=objectif["nom"], font=("Arial", 14, "bold"), text_color=self.TEXTE
-            ).pack(anchor="w", padx=16, pady=(13, 2))
+                entete, text=objectif["nom"], font=("Arial", 14, "bold"), text_color=self.TEXTE
+            ).pack(side="left")
+            if actuel < cible:
+                ctk.CTkButton(
+                    entete,text="+ Ajouter de l'argent",height=30,fg_color=self.VERT,
+                    hover_color=self.VERT_FONCE,
+                    command=lambda o=objectif:self._ouvrir_versement(o),
+                ).pack(side="right")
             date_affichee = datetime.fromisoformat(objectif["date_cible"]).strftime("%d/%m/%Y")
             texte = f"{actuel:,.2f} € sur {cible:,.2f} € · cible le {date_affichee}"
             ctk.CTkLabel(

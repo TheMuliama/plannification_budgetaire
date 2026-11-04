@@ -18,7 +18,6 @@ from serveur.services.depenses import GestionnaireDepenses
 from serveur.services.objectifs_epargne import GestionnaireObjectifsEpargne
 from serveur.services.revenus import GestionnaireRevenus
 from serveur.services.utilisateurs import GestionnaireUtilisateurs
-from serveur.services.projection import MoteurProjection
 
 
 class ApplicationServeur:
@@ -31,7 +30,6 @@ class ApplicationServeur:
         self.budgets=GestionnaireBudget(RepositoryBudgets(connexion))
         self.depenses=GestionnaireDepenses(RepositoryDepenses(connexion))
         self.objectifs=GestionnaireObjectifsEpargne(RepositoryObjectifsEpargne(connexion))
-        self.projection=MoteurProjection()
         self._sessions: dict[str,int]={}
 
     def traitements(self) -> dict[str, Any]:
@@ -52,7 +50,9 @@ class ApplicationServeur:
             "depenses.lister":self.lister_depenses,"objectifs.creer":self.creer_objectif,
             "objectifs.lister":self.lister_objectifs,
             "objectifs.analyser":self.analyser_objectifs,
-            "projection.simuler":self.simuler_depense}
+            "objectifs.alimenter":self.alimenter_objectif,
+            "objectifs.versements":self.lister_versements,
+            "solde.obtenir":self.obtenir_solde}
 
     def creer_compte(self, d: dict[str,Any]) -> dict[str,Any]:
         return self.utilisateurs.creer_compte(d["identifiant"],d["mot_de_passe"])
@@ -96,12 +96,13 @@ class ApplicationServeur:
         try: montant=float(donnees["montant"])
         except (KeyError,TypeError,ValueError) as erreur:
             raise ValueError("Le montant de la dépense est invalide.") from erreur
-        revenus=sum(float(x["montant"]) for x in
-                    self.revenus.consulter_revenus(utilisateur_id,statut="recu"))
         depenses=sum(float(x["montant"]) for x in
                      self.depenses.consulter_depenses(utilisateur_id,"realisee")
                      if x["id"] != depense_ignoree)
-        disponible=round(revenus-depenses,2)
+        revenus=sum(float(x["montant"]) for x in
+                    self.revenus.consulter_revenus(utilisateur_id,statut="recu"))
+        epargne=self.objectifs.total_versements(utilisateur_id)
+        disponible=round(revenus-depenses-epargne,2)
         if montant > disponible + 1e-9:
             raise ValueError(
                 f"Solde insuffisant : {disponible:.2f} € disponible(s). "
@@ -121,6 +122,25 @@ class ApplicationServeur:
     def lister_depenses(self,d): return self.depenses.consulter_depenses(self._id(d),d.get("statut"))
     def creer_objectif(self,d): return self.objectifs.creer_objectif({**d,"utilisateur_id":self._id(d)})
     def lister_objectifs(self,d): return self.objectifs.consulter_objectifs(self._id(d))
+    def lister_versements(self,d):
+        return self.objectifs.consulter_versements(self._id(d),d.get("objectif_id"))
+    def obtenir_solde(self,d):
+        utilisateur_id=self._id(d)
+        revenus=sum(float(x["montant"]) for x in
+                    self.revenus.consulter_revenus(utilisateur_id,statut="recu"))
+        depenses=sum(float(x["montant"]) for x in
+                     self.depenses.consulter_depenses(utilisateur_id,"realisee"))
+        epargne=self.objectifs.total_versements(utilisateur_id)
+        return {"revenus":round(revenus,2),"depenses":round(depenses,2),
+                "epargne":round(epargne,2),"disponible":round(revenus-depenses-epargne,2)}
+    def alimenter_objectif(self,d):
+        utilisateur_id=self._id(d); montant=float(d["montant"])
+        disponible=self.obtenir_solde(d)["disponible"]
+        if montant > disponible + 1e-9:
+            raise ValueError(f"Solde insuffisant : {disponible:.2f} € disponible(s).")
+        return self.objectifs.alimenter_objectif(
+            utilisateur_id,d["objectif_id"],montant,d["date"]
+        )
     def analyser_objectifs(self,d):
         utilisateur_id=self._id(d); aujourd_hui=date.today()
         debut=aujourd_hui.replace(day=1).isoformat()
@@ -129,32 +149,20 @@ class ApplicationServeur:
         depenses=[x for x in depenses if debut <= x["date"] <= aujourd_hui.isoformat()]
         revenu_mois=sum(float(x["montant"]) for x in revenus)
         depense_mois=sum(float(x["montant"]) for x in depenses)
-        epargne_maximale=max(0.0,revenu_mois-depense_mois)
+        versements_mois=self.objectifs.total_versements(
+            utilisateur_id,debut,aujourd_hui.isoformat()
+        )
+        epargne_maximale=max(0.0,revenu_mois-depense_mois-versements_mois)
         analyses=[]
         for objectif in self.objectifs.consulter_objectifs(utilisateur_id):
             plan=self.objectifs.determiner_plan_epargne({**objectif,"utilisateur_id":utilisateur_id})
             requise=float(plan["montant_periodique_recommande"])
             analyses.append({**objectif,**plan,"revenus_mois":round(revenu_mois,2),
-                "depenses_mois":round(depense_mois,2),"epargne_maximale":round(epargne_maximale,2),
+                "depenses_mois":round(depense_mois,2),"versements_mois":round(versements_mois,2),
+                "epargne_maximale":round(epargne_maximale,2),
                 "revenu_utilisable":round(max(0.0,revenu_mois-requise),2),
                 "objectif_atteignable":requise <= epargne_maximale})
         return analyses
-    def simuler_depense(self,d):
-        utilisateur_id=self._id(d)
-        aujourd_hui=date.today()
-        budgets=self.budgets.consulter_budget(utilisateur_id,aujourd_hui.year,aujourd_hui.month)
-        depenses=self.depenses.consulter_depenses(utilisateur_id,"realisee")
-        depenses=[depense for depense in depenses
-                  if date.fromisoformat(depense["date"]).year==aujourd_hui.year
-                  and date.fromisoformat(depense["date"]).month==aujourd_hui.month]
-        total_budget=sum(float(b["montant_alloue"]) for b in budgets)
-        total_depenses=sum(float(x["montant"]) for x in depenses)
-        objectifs=self.objectifs.consulter_objectifs(utilisateur_id)
-        objectif=objectifs[0] if objectifs else {"montant_periodique":0}
-        return self.projection.simuler_ajout_depense(
-            {"budget_restant":total_budget-total_depenses,
-             "budget_flexible":total_budget-total_depenses},
-            {"montant":float(d["montant"])},objectif)
 
 
 def construire_serveur(connexion: sqlite3.Connection) -> ServeurSocket:

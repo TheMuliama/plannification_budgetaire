@@ -66,13 +66,19 @@ def test_parcours_authentifie_et_isole() -> None:
         "session":session,"montant":100,"date":"2026-11-04","description":"Salaire",
         "statut":"recu","categorie":"Salaire"}})
     assert revenu["succes"] is True
+    versement=serveur.traiter_message({"action":"objectifs.alimenter","donnees":{
+        "session":session,"objectif_id":objectif["donnees"]["id"],
+        "montant":10,"date":"2026-11-04"}})
+    assert versement["succes"] is True
+    solde=serveur.traiter_message({"action":"solde.obtenir","donnees":{"session":session}})
+    assert solde["donnees"]=={"revenus":100.0,"depenses":0,"epargne":10.0,"disponible":90.0}
     depense_creee=serveur.traiter_message({"action":"depenses.creer","donnees":depense})
     assert depense_creee["succes"] is True
     depense_trop_grande=serveur.traiter_message({"action":"depenses.creer","donnees":{
-        **depense,"montant":21}})
+        **depense,"montant":11}})
     assert depense_trop_grande["succes"] is False
     modification=serveur.traiter_message({"action":"depenses.modifier","donnees":{
-        **depense,"id":depense_creee["donnees"]["id"],"montant":100}})
+        **depense,"id":depense_creee["donnees"]["id"],"montant":90}})
     assert modification["succes"] is True
     assert serveur.traiter_message({"action":"categories.lister","donnees":{
         "session":"invalide"}})["succes"] is False

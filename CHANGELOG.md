@@ -4,6 +4,9 @@
 
 ### Added
 
+- Ajouter des versements d'épargne persistants, déduits du solde disponible et
+  intégrés aux contrôles empêchant les dépenses à découvert.
+
 - Ajouter les transactions récurrentes hebdomadaires, mensuelles ou annuelles,
   avec une date de fin et le statut prévu pour les occurrences futures.
 
@@ -66,6 +69,9 @@
   ([#2](https://github.com/TheMuliama/plannification_budgetaire/issues/2)).
 
 ### Fixed
+
+- Remplacer le simulateur de dépense de l'écran Épargne par un parcours réel
+  d'alimentation des objectifs et afficher le solde disponible sur le tableau de bord.
 
 - Interdire côté serveur toute dépense réalisée qui rendrait le solde négatif,
   y compris lors de la modification d'une dépense existante.
