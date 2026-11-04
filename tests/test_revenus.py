@@ -6,6 +6,7 @@ import pytest
 
 from persistance.database import Database
 from persistance.repositories.revenus import RepositoryRevenus
+from serveur.services.revenus import GestionnaireRevenus
 
 
 @pytest.fixture
@@ -18,6 +19,11 @@ def repository_revenus() -> RepositoryRevenus:
     )
     yield RepositoryRevenus(connexion)
     connexion.close()
+
+
+@pytest.fixture
+def gestionnaire_revenus(repository_revenus: RepositoryRevenus) -> GestionnaireRevenus:
+    return GestionnaireRevenus(repository_revenus)
 
 
 def test_ajouter_et_obtenir_un_revenu(repository_revenus: RepositoryRevenus) -> None:
@@ -71,3 +77,76 @@ def test_isoler_les_revenus_par_utilisateur(repository_revenus: RepositoryRevenu
         2, revenu_id, 999, "2026-11-04", None, "recu"
     ) is False
     assert repository_revenus.supprimer_revenu(2, revenu_id) is False
+
+
+def test_service_gerer_le_cycle_de_vie_d_un_revenu(
+    gestionnaire_revenus: GestionnaireRevenus,
+) -> None:
+    revenu = gestionnaire_revenus.ajouter_revenu(
+        {
+            "utilisateur_id": 1,
+            "montant": 250,
+            "date": "2026-11-04",
+            "description": "  Mission  ",
+            "statut": "prevu",
+        }
+    )
+    assert revenu["description"] == "Mission"
+
+    revenu_modifie = gestionnaire_revenus.modifier_revenu(
+        1,
+        revenu["id"],
+        {
+            "montant": 275,
+            "date": "2026-11-05",
+            "description": None,
+            "statut": "recu",
+        },
+    )
+    assert revenu_modifie["montant"] == 275
+    assert revenu_modifie["statut"] == "recu"
+
+    gestionnaire_revenus.supprimer_revenu(1, revenu["id"])
+    assert gestionnaire_revenus.consulter_revenus(1) == []
+
+
+@pytest.mark.parametrize(
+    "modification",
+    (
+        {"montant": 0},
+        {"montant": float("nan")},
+        {"date": "04/11/2026"},
+        {"statut": "encaisse"},
+    ),
+)
+def test_service_refuser_un_revenu_invalide(
+    gestionnaire_revenus: GestionnaireRevenus,
+    modification: dict,
+) -> None:
+    revenu = {
+        "utilisateur_id": 1,
+        "montant": 100,
+        "date": "2026-11-04",
+        "description": None,
+        "statut": "recu",
+    }
+    revenu.update(modification)
+
+    with pytest.raises(ValueError):
+        gestionnaire_revenus.ajouter_revenu(revenu)
+
+
+def test_service_interdire_l_acces_au_revenu_d_un_autre_utilisateur(
+    gestionnaire_revenus: GestionnaireRevenus,
+) -> None:
+    revenu = gestionnaire_revenus.ajouter_revenu(
+        {
+            "utilisateur_id": 1,
+            "montant": 100,
+            "date": "2026-11-04",
+            "statut": "recu",
+        }
+    )
+
+    with pytest.raises(ValueError, match="introuvable"):
+        gestionnaire_revenus.supprimer_revenu(2, revenu["id"])
