@@ -15,3 +15,9 @@
 - Ajouter les fonctions de hachage et de vérification des mots de passe avec
   Argon2id et un sel aléatoire, destinées au futur service utilisateurs
   ([#2](https://github.com/TheMuliama/plannification_budgetaire/issues/2)).
+
+### Fixed
+
+- Valider et normaliser les noms des catégories et sous-catégories, avec des
+  tests respectant les clés étrangères du schéma SQLite
+  ([#7](https://github.com/TheMuliama/plannification_budgetaire/issues/7)).
