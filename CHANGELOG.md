@@ -41,6 +41,9 @@
 
 ### Security
 
+- Permettre le changement de mot de passe et la suppression du compte après
+  une nouvelle vérification du secret de l'utilisateur.
+
 - Raccorder la création et l'authentification des comptes au hachage Argon2id,
   sans exposer le mot de passe enregistré dans les réponses du service
   ([#4](https://github.com/TheMuliama/plannification_budgetaire/issues/4)).

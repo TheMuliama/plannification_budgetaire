@@ -92,6 +92,28 @@ class GestionnaireUtilisateurs:
             raise ValueError("Compte utilisateur introuvable.")
         return self._sans_mot_de_passe(utilisateur)
 
+    def changer_mot_de_passe(self, identifiant_utilisateur: int,
+                             ancien: str, nouveau: str) -> None:
+        """Vérifier l'ancien secret avant d'enregistrer le nouveau hachage."""
+        utilisateur = self._repository.recuperer_par_id(identifiant_utilisateur)
+        if utilisateur is None or not verifier_mot_de_passe(ancien, utilisateur["mot_de_passe"]):
+            raise ValueError("Le mot de passe actuel est incorrect.")
+        self._valider_mot_de_passe(nouveau)
+        if ancien == nouveau:
+            raise ValueError("Le nouveau mot de passe doit être différent.")
+        self._repository.modifier_mot_de_passe(
+            identifiant_utilisateur,
+            hacher_mot_de_passe(nouveau),
+        )
+
+    def supprimer_compte_authentifie(self, identifiant_utilisateur: int,
+                                     mot_de_passe: str) -> None:
+        """Supprimer le compte après une nouvelle vérification du secret."""
+        utilisateur=self._repository.recuperer_par_id(identifiant_utilisateur)
+        if utilisateur is None or not verifier_mot_de_passe(mot_de_passe,utilisateur["mot_de_passe"]):
+            raise ValueError("Le mot de passe est incorrect.")
+        self._repository.supprimer_utilisateur(identifiant_utilisateur)
+
     @staticmethod
     def _valider_identifiant(identifiant: str) -> str:
         if not isinstance(identifiant, str) or not identifiant.strip():

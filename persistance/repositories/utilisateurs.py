@@ -49,3 +49,13 @@ class RepositoryUtilisateurs:
                 (identifiant_utilisateur,),
             )
         return curseur.rowcount > 0
+
+    def modifier_mot_de_passe(self, identifiant_utilisateur: int,
+                              mot_de_passe_hache: str) -> bool:
+        """Remplacer le hachage du mot de passe d'un utilisateur."""
+        with self._connexion:
+            curseur = self._connexion.execute(
+                "UPDATE utilisateurs SET mot_de_passe = ? WHERE id = ?",
+                (mot_de_passe_hache, identifiant_utilisateur),
+            )
+        return curseur.rowcount > 0

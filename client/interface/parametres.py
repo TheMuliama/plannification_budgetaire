@@ -2,7 +2,7 @@
 """Écran des paramètres côté client."""
 
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 
 class VueParametres(ctk.CTkFrame):
@@ -17,7 +17,8 @@ class VueParametres(ctk.CTkFrame):
         on_modifier_profil=None,
         on_changer_mot_de_passe=None,
         on_changer_theme=None,
-        on_deconnexion=None
+        on_deconnexion=None,
+        on_supprimer_compte=None
     ):
         super().__init__(master, fg_color="#F5F3EF")
 
@@ -25,6 +26,7 @@ class VueParametres(ctk.CTkFrame):
         self.on_modifier_profil = on_modifier_profil
         self.on_changer_mot_de_passe = on_changer_mot_de_passe
         self.on_deconnexion = on_deconnexion
+        self.on_supprimer_compte = on_supprimer_compte
 
         # Couleurs
         self.vert = "#00634F"
@@ -273,6 +275,23 @@ class VueParametres(ctk.CTkFrame):
             pady=(0, 20)
         )
 
+        ctk.CTkButton(
+            carte,text="Supprimer définitivement le compte",height=40,
+            fg_color="#8B0000",hover_color="#650000",command=self.supprimer_compte
+        ).pack(anchor="w",padx=20,pady=(0,20))
+
+    def supprimer_compte(self):
+        """Confirmer la suppression et demander à nouveau le mot de passe."""
+        if not messagebox.askyesno("Suppression définitive",
+                "Supprimer le compte et toutes ses données ?",parent=self.winfo_toplevel()): return
+        mot_de_passe=simpledialog.askstring("Confirmation","Saisissez votre mot de passe :",
+                                            show="*",parent=self.winfo_toplevel())
+        if not mot_de_passe: return
+        try:
+            self.on_supprimer_compte(mot_de_passe)
+        except (ConnectionError,OSError,ValueError) as erreur:
+            messagebox.showerror("Suppression impossible",str(erreur),parent=self.winfo_toplevel())
+
     def actualiser(self, profil, theme="Clair"):
         """Actualiser les données du profil.
 
@@ -397,10 +416,11 @@ class VueParametres(ctk.CTkFrame):
             )
             return
 
-        self.on_changer_mot_de_passe(
-            ancien,
-            nouveau
-        )
+        try:
+            self.on_changer_mot_de_passe(ancien, nouveau)
+        except (ConnectionError, OSError, ValueError) as erreur:
+            self.message_securite.configure(text=str(erreur), text_color=self.rouge)
+            return
 
         self.message_securite.configure(
             text="Demande de changement transmise.",

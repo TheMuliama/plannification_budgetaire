@@ -35,7 +35,10 @@ class ApplicationServeur:
 
     def traitements(self) -> dict[str, Any]:
         return {"utilisateurs.creer":self.creer_compte,"utilisateurs.connecter":self.connecter,
-            "utilisateurs.deconnecter":self.deconnecter,"categories.creer":self.creer_categorie,
+            "utilisateurs.deconnecter":self.deconnecter,
+            "utilisateurs.changer_mot_de_passe":self.changer_mot_de_passe,
+            "utilisateurs.supprimer":self.supprimer_compte,
+            "categories.creer":self.creer_categorie,
             "categories.lister":self.lister_categories,"revenus.creer":self.creer_revenu,
             "revenus.modifier":self.modifier_revenu,"revenus.supprimer":self.supprimer_revenu,
             "revenus.lister":self.lister_revenus,"budgets.creer":self.creer_budget,
@@ -56,6 +59,13 @@ class ApplicationServeur:
         return {"session":jeton,"utilisateur":compte}
 
     def deconnecter(self,d): self._sessions.pop(d.get("session",""),None); return None
+    def changer_mot_de_passe(self,d):
+        self.utilisateurs.changer_mot_de_passe(self._id(d),d["ancien"],d["nouveau"])
+        return None
+    def supprimer_compte(self,d):
+        jeton=d.get("session",""); utilisateur_id=self._id(d)
+        self.utilisateurs.supprimer_compte_authentifie(utilisateur_id,d["mot_de_passe"])
+        self._sessions.pop(jeton,None); return None
     def _id(self,d):
         try: return self._sessions[d["session"]]
         except KeyError as erreur: raise ValueError("Session invalide ou expirée.") from erreur

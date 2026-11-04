@@ -527,7 +527,8 @@ class ApplicationMonBudget(ctk.CTk):
             on_modifier_profil=self.modifier_profil,
             on_changer_mot_de_passe=self.changer_mot_de_passe,
             on_changer_theme=self.changer_theme,
-            on_deconnexion=self.deconnecter
+            on_deconnexion=self.deconnecter,
+            on_supprimer_compte=self.supprimer_compte
         )
 
         self.vue.pack(fill="both", expand=True)
@@ -888,14 +889,8 @@ class ApplicationMonBudget(ctk.CTk):
             )
 
     def changer_mot_de_passe(self, ancien, nouveau):
-        """Signaler que la fonction n'est pas disponible."""
-
-        if self.page_actuelle == "parametres":
-            self.vue.afficher_erreur(
-                "securite",
-                "Le changement de mot de passe nécessite "
-                "un serveur d'authentification."
-            )
+        """Changer le mot de passe du compte authentifié."""
+        self.api.appeler("utilisateurs.changer_mot_de_passe",ancien=ancien,nouveau=nouveau)
 
     def changer_theme(self, valeur):
         """Enregistrer temporairement la préférence."""
@@ -927,6 +922,13 @@ class ApplicationMonBudget(ctk.CTk):
         self.theme = "Clair"
         ctk.set_appearance_mode("light")
 
+        self.afficher_connexion()
+
+    def supprimer_compte(self, mot_de_passe):
+        """Supprimer le compte courant et revenir à la connexion."""
+        self.api.appeler("utilisateurs.supprimer",mot_de_passe=mot_de_passe)
+        self.api.session=None
+        self.transactions.clear(); self.budgets.clear(); self.profil.clear()
         self.afficher_connexion()
 
 
