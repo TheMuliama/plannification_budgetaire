@@ -89,8 +89,34 @@ class ApplicationServeur:
     def modifier_budget(self,d): return self.budgets.modifier_budget(self._id(d),d["id"],d)
     def supprimer_budget(self,d): self.budgets.supprimer_budget(self._id(d),d["id"]); return None
     def lister_budgets(self,d): return self.budgets.consulter_budget(self._id(d),d.get("annee"),d.get("mois"))
-    def creer_depense(self,d): return self.depenses.ajouter_depense({**d,"utilisateur_id":self._id(d)})
-    def modifier_depense(self,d): return self.depenses.modifier_depense(self._id(d),d["id"],d)
+    def _verifier_solde(self,utilisateur_id: int,donnees: dict[str,Any],
+                        depense_ignoree: int | None=None) -> None:
+        """Refuser une dépense réalisée qui rendrait le solde négatif."""
+        if donnees.get("statut") != "realisee": return
+        try: montant=float(donnees["montant"])
+        except (KeyError,TypeError,ValueError) as erreur:
+            raise ValueError("Le montant de la dépense est invalide.") from erreur
+        revenus=sum(float(x["montant"]) for x in
+                    self.revenus.consulter_revenus(utilisateur_id,statut="recu"))
+        depenses=sum(float(x["montant"]) for x in
+                     self.depenses.consulter_depenses(utilisateur_id,"realisee")
+                     if x["id"] != depense_ignoree)
+        disponible=round(revenus-depenses,2)
+        if montant > disponible + 1e-9:
+            raise ValueError(
+                f"Solde insuffisant : {disponible:.2f} € disponible(s). "
+                "Une dépense ne peut pas rendre le solde négatif."
+            )
+    def creer_depense(self,d):
+        utilisateur_id=self._id(d); self._verifier_solde(utilisateur_id,d)
+        return self.depenses.ajouter_depense({**d,"utilisateur_id":utilisateur_id})
+    def modifier_depense(self,d):
+        utilisateur_id=self._id(d)
+        existante=next((x for x in self.depenses.consulter_depenses(utilisateur_id)
+                        if x["id"]==d["id"]),None)
+        if existante is None: raise ValueError("Dépense introuvable pour cet utilisateur.")
+        self._verifier_solde(utilisateur_id,d,d["id"])
+        return self.depenses.modifier_depense(utilisateur_id,d["id"],d)
     def supprimer_depense(self,d): self.depenses.supprimer_depense(self._id(d),d["id"]); return None
     def lister_depenses(self,d): return self.depenses.consulter_depenses(self._id(d),d.get("statut"))
     def creer_objectif(self,d): return self.objectifs.creer_objectif({**d,"utilisateur_id":self._id(d)})

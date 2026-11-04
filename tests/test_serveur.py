@@ -52,6 +52,28 @@ def test_parcours_authentifie_et_isole() -> None:
         "session":session}})
     assert analyse["donnees"][0]["montant_restant"]==1200
     assert "epargne_maximale" in analyse["donnees"][0]
+    budget=serveur.traiter_message({"action":"budgets.creer","donnees":{
+        "session":session,"annee":2026,"mois":11,"categorie_id":creation["donnees"]["id"],
+        "sous_categorie_id":sous_categorie["donnees"]["id"],"montant_alloue":200}})
+    depense={"session":session,"budget_id":budget["donnees"]["id"],
+        "categorie_id":creation["donnees"]["id"],
+        "sous_categorie_id":sous_categorie["donnees"]["id"],"montant":80,
+        "date":"2026-11-04","description":"Courses","statut":"realisee"}
+    sans_solde=serveur.traiter_message({"action":"depenses.creer","donnees":depense})
+    assert sans_solde["succes"] is False
+    assert "Solde insuffisant" in sans_solde["erreur"]
+    revenu=serveur.traiter_message({"action":"revenus.creer","donnees":{
+        "session":session,"montant":100,"date":"2026-11-04","description":"Salaire",
+        "statut":"recu","categorie":"Salaire"}})
+    assert revenu["succes"] is True
+    depense_creee=serveur.traiter_message({"action":"depenses.creer","donnees":depense})
+    assert depense_creee["succes"] is True
+    depense_trop_grande=serveur.traiter_message({"action":"depenses.creer","donnees":{
+        **depense,"montant":21}})
+    assert depense_trop_grande["succes"] is False
+    modification=serveur.traiter_message({"action":"depenses.modifier","donnees":{
+        **depense,"id":depense_creee["donnees"]["id"],"montant":100}})
+    assert modification["succes"] is True
     assert serveur.traiter_message({"action":"categories.lister","donnees":{
         "session":"invalide"}})["succes"] is False
     connexion.close()

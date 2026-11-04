@@ -600,6 +600,21 @@ class ApplicationMonBudget(ctk.CTk):
                          and b["annee"]==date_transaction.year and b["mois"]==date_transaction.month),None)
             if budget is None:
                 raise ValueError("Aucun budget pour cette catégorie au mois de la transaction.")
+            occurrences_realisees=sum(
+                1 for occurrence in occurrences if occurrence <= datetime.now().date()
+            )
+            solde=sum(
+                (Decimal(str(t["montant"])) for t in self.transactions
+                 if t["type"]=="Revenu" and t.get("statut")=="recu"),Decimal("0")
+            )-sum(
+                (Decimal(str(t["montant"])) for t in self.transactions
+                 if t["type"]=="Dépense" and t.get("statut")=="realisee"),Decimal("0")
+            )
+            total_immediat=donnees["montant"]*occurrences_realisees
+            if total_immediat > solde:
+                raise ValueError(
+                    f"Solde insuffisant : {solde:.2f} € disponible(s)."
+                )
             for occurrence in occurrences:
                 self.api.appeler("depenses.creer",budget_id=budget["id"],
                     categorie_id=budget["categorie_id"],sous_categorie_id=budget["sous_categorie_id"],

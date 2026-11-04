@@ -67,6 +67,9 @@
 
 ### Fixed
 
+- Interdire côté serveur toute dépense réalisée qui rendrait le solde négatif,
+  y compris lors de la modification d'une dépense existante.
+
 - Rendre les calendriers des transactions et objectifs réellement interactifs.
 
 - Trier l'historique des transactions par date et masquer les alertes avant 80 %.
