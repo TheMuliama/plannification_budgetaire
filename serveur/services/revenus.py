@@ -1,6 +1,10 @@
 """Service de gestion des revenus."""
 
+from datetime import date
+from math import isfinite
 from typing import Any
+
+from persistance.repositories.revenus import RepositoryRevenus
 
 
 class GestionnaireRevenus:
@@ -9,6 +13,9 @@ class GestionnaireRevenus:
     Cette classe enregistre et consulte les revenus sans implémenter leurs
     calculs.
     """
+
+    def __init__(self, repository: RepositoryRevenus) -> None:
+        self._repository = repository
 
     def ajouter_revenu(self, revenu: dict[str, Any]) -> dict[str, Any]:
         """Ajouter un revenu prévisionnel ou réel.
@@ -19,9 +26,21 @@ class GestionnaireRevenus:
         Returns:
             Le revenu enregistré.
         """
-        pass
+        donnees = self._valider_revenu(revenu)
+        identifiant = self._repository.ajouter_revenu(**donnees)
+        revenu_enregistre = self._repository.obtenir_revenu(
+            donnees["utilisateur_id"],
+            identifiant,
+        )
+        assert revenu_enregistre is not None
+        return revenu_enregistre
 
-    def modifier_revenu(self, identifiant_revenu: int, revenu: dict[str, Any]) -> dict[str, Any]:
+    def modifier_revenu(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_revenu: int,
+        revenu: dict[str, Any],
+    ) -> dict[str, Any]:
         """Modifier un revenu existant.
 
         Args:
@@ -31,9 +50,31 @@ class GestionnaireRevenus:
         Returns:
             Le revenu modifié.
         """
-        pass
+        donnees = self._valider_revenu(
+            {**revenu, "utilisateur_id": identifiant_utilisateur}
+        )
+        modifie = self._repository.modifier_revenu(
+            identifiant_utilisateur,
+            identifiant_revenu,
+            donnees["montant"],
+            donnees["date"],
+            donnees["description"],
+            donnees["statut"],
+        )
+        if not modifie:
+            raise ValueError("Revenu introuvable pour cet utilisateur.")
+        resultat = self._repository.obtenir_revenu(
+            identifiant_utilisateur,
+            identifiant_revenu,
+        )
+        assert resultat is not None
+        return resultat
 
-    def supprimer_revenu(self, identifiant_revenu: int) -> None:
+    def supprimer_revenu(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_revenu: int,
+    ) -> None:
         """Supprimer un revenu.
 
         Args:
@@ -42,9 +83,19 @@ class GestionnaireRevenus:
         Returns:
             None.
         """
-        pass
+        if not self._repository.supprimer_revenu(
+            identifiant_utilisateur,
+            identifiant_revenu,
+        ):
+            raise ValueError("Revenu introuvable pour cet utilisateur.")
 
-    def consulter_revenus(self, identifiant_utilisateur: int) -> list[dict[str, Any]]:
+    def consulter_revenus(
+        self,
+        identifiant_utilisateur: int,
+        debut: str | None = None,
+        fin: str | None = None,
+        statut: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Consulter les revenus d'un utilisateur.
 
         Args:
@@ -53,4 +104,53 @@ class GestionnaireRevenus:
         Returns:
             La liste de ses revenus.
         """
-        pass
+        if debut is not None:
+            self._valider_date(debut)
+        if fin is not None:
+            self._valider_date(fin)
+        if debut is not None and fin is not None and debut > fin:
+            raise ValueError("La date de début doit précéder la date de fin.")
+        if statut is not None and statut not in {"prevu", "recu"}:
+            raise ValueError("Le statut du revenu est invalide.")
+        return self._repository.consulter_revenus(
+            identifiant_utilisateur,
+            debut,
+            fin,
+            statut,
+        )
+
+    @classmethod
+    def _valider_revenu(cls, revenu: dict[str, Any]) -> dict[str, Any]:
+        try:
+            utilisateur_id = int(revenu["utilisateur_id"])
+            montant = float(revenu["montant"])
+            date_revenu = revenu["date"]
+            statut = revenu["statut"]
+        except (KeyError, TypeError, ValueError) as erreur:
+            raise ValueError("Les informations du revenu sont incomplètes.") from erreur
+        if utilisateur_id <= 0:
+            raise ValueError("L'utilisateur du revenu est invalide.")
+        if not isfinite(montant) or montant <= 0:
+            raise ValueError("Le montant du revenu doit être strictement positif.")
+        cls._valider_date(date_revenu)
+        if statut not in {"prevu", "recu"}:
+            raise ValueError("Le statut du revenu est invalide.")
+        description = revenu.get("description")
+        if description is not None:
+            if not isinstance(description, str):
+                raise ValueError("La description du revenu est invalide.")
+            description = description.strip() or None
+        return {
+            "utilisateur_id": utilisateur_id,
+            "montant": montant,
+            "date": date_revenu,
+            "description": description,
+            "statut": statut,
+        }
+
+    @staticmethod
+    def _valider_date(valeur: str) -> None:
+        try:
+            date.fromisoformat(valeur)
+        except (TypeError, ValueError) as erreur:
+            raise ValueError("La date du revenu doit être au format AAAA-MM-JJ.") from erreur
