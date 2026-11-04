@@ -134,7 +134,8 @@ class GestionnaireObjectifsEpargne:
         except (KeyError,AttributeError,TypeError,ValueError) as erreur:
             raise ValueError("Informations de l'objectif invalides.") from erreur
         if not resultat["nom"]: raise ValueError("Le nom de l'objectif est obligatoire.")
-        if resultat["utilisateur_id"]<=0 or resultat["montant_cible"]<=0:
+        if (resultat["utilisateur_id"]<=0 or resultat["montant_cible"]<=0 or
+                not isfinite(resultat["montant_cible"])):
             raise ValueError("Le propriétaire ou la cible est invalide.")
         if any(not isfinite(resultat[c]) or resultat[c]<0 for c in ("montant_actuel","montant_periodique")):
             raise ValueError("Les montants de l'objectif sont invalides.")

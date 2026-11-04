@@ -123,3 +123,12 @@ def test_normaliser_le_nom(gestionnaire_categories: GestionnaireCategories) -> N
     categorie = gestionnaire_categories.creer_categorie(1, "  Alimentation  ")
 
     assert categorie["nom"] == "Alimentation"
+
+
+def test_refuser_une_categorie_dupliquee(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
+    gestionnaire_categories.creer_categorie(1, "Alimentation")
+
+    with pytest.raises(ValueError, match="existe déjà"):
+        gestionnaire_categories.creer_categorie(1, "Alimentation")

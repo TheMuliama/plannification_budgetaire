@@ -21,6 +21,11 @@ def test_convertir_erreur_metier_en_reponse() -> None:
     reponse=ServeurSocket({"echouer":echouer}).traiter_message({"action":"echouer"})
     assert reponse["erreur"]=="Données invalides"
 
+def test_masquer_une_erreur_interne() -> None:
+    def echouer(donnees): raise RuntimeError("information technique sensible")
+    reponse=ServeurSocket({"echouer":echouer}).traiter_message({"action":"echouer"})
+    assert reponse["erreur"]=="Erreur interne du serveur."
+
 def test_parcours_authentifie_et_isole() -> None:
     connexion=Database().connecter(":memory:")
     connexion.executescript(Path("persistance/schema.sql").read_text(encoding="utf-8"))

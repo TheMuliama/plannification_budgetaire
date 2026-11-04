@@ -1,5 +1,7 @@
 """Service de gestion des catégories."""
 
+import sqlite3
+
 from persistance.repositories.categories import RepositoryCategories
 
 
@@ -29,10 +31,13 @@ class GestionnaireCategories:
         Returns:
             La catégorie créée.
         """
-        return self._repository.creer_categorie(
-            identifiant_utilisateur,
-            self._valider_nom(nom),
-        )
+        try:
+            return self._repository.creer_categorie(
+                identifiant_utilisateur,
+                self._valider_nom(nom),
+            )
+        except sqlite3.IntegrityError as erreur:
+            raise ValueError("Cette catégorie existe déjà.") from erreur
 
     def recuperer_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int) -> dict[str, int | str]:
         """Récupérer une catégorie appartenant à un utilisateur.
@@ -118,10 +123,13 @@ class GestionnaireCategories:
             ValueError: Si la catégorie n'existe pas pour cet utilisateur.
         """
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
-        return self._repository.creer_sous_categorie(
-            identifiant_categorie,
-            self._valider_nom(nom),
-        )
+        try:
+            return self._repository.creer_sous_categorie(
+                identifiant_categorie,
+                self._valider_nom(nom),
+            )
+        except sqlite3.IntegrityError as erreur:
+            raise ValueError("Cette sous-catégorie existe déjà.") from erreur
 
     def recuperer_sous_categories(self, identifiant_utilisateur: int, identifiant_categorie: int) -> list[dict[str, int | str]]:
         """Récupérer les sous-catégories d'une catégorie de l'utilisateur.

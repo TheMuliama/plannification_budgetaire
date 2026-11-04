@@ -58,6 +58,9 @@ class ServeurSocket:
             return {"succes":True,"donnees":resultat,"erreur":None,"requete_id":identifiant}
         except (ValueError,KeyError,TypeError) as erreur:
             return {"succes":False,"donnees":None,"erreur":str(erreur),"requete_id":identifiant}
+        except Exception:
+            return {"succes":False,"donnees":None,
+                    "erreur":"Erreur interne du serveur.","requete_id":identifiant}
 
     def fermer(self) -> None:
         if self._socket is not None: self._socket.close(); self._socket=None
