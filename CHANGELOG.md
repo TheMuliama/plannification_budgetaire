@@ -16,6 +16,10 @@
 
 ### Security
 
+- Raccorder la création et l'authentification des comptes au hachage Argon2id,
+  sans exposer le mot de passe enregistré dans les réponses du service
+  ([#4](https://github.com/TheMuliama/plannification_budgetaire/issues/4)).
+
 - Ajouter les fonctions de hachage et de vérification des mots de passe avec
   Argon2id et un sel aléatoire, destinées au futur service utilisateurs
   ([#2](https://github.com/TheMuliama/plannification_budgetaire/issues/2)).
