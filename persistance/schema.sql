@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS revenus (
     date TEXT NOT NULL,
     description TEXT,
 
+    categorie TEXT NOT NULL DEFAULT 'Salaire',
+
     statut TEXT NOT NULL CHECK (
         statut IN ('prevu', 'recu')
     ),
@@ -226,6 +228,27 @@ CREATE TABLE IF NOT EXISTS objectifs_epargne (
 
 
 -- ============================================================
+-- VERSEMENTS D'EPARGNE
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS versements_epargne (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    utilisateur_id INTEGER NOT NULL,
+    objectif_id INTEGER NOT NULL,
+    montant REAL NOT NULL CHECK (montant > 0),
+    date TEXT NOT NULL,
+
+    FOREIGN KEY (utilisateur_id)
+        REFERENCES utilisateurs(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (objectif_id)
+        REFERENCES objectifs_epargne(id)
+        ON DELETE CASCADE
+);
+
+
+-- ============================================================
 -- ALERTES
 -- ============================================================
 
@@ -293,6 +316,12 @@ CREATE INDEX IF NOT EXISTS index_soldes_compte
 
 CREATE INDEX IF NOT EXISTS index_objectifs_utilisateur
     ON objectifs_epargne(utilisateur_id);
+
+CREATE INDEX IF NOT EXISTS index_versements_utilisateur
+    ON versements_epargne(utilisateur_id);
+
+CREATE INDEX IF NOT EXISTS index_versements_objectif
+    ON versements_epargne(objectif_id);
 
 CREATE INDEX IF NOT EXISTS index_alertes_utilisateur
     ON alertes(utilisateur_id);

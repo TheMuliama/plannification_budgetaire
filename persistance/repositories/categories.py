@@ -18,7 +18,9 @@ class RepositoryCategories:
         """
         self._connexion = connexion
 
-    def creer_categorie(self, identifiant_utilisateur: int, nom: str) -> dict[str, int | str]:
+    def creer_categorie(
+        self, identifiant_utilisateur: int, nom: str
+    ) -> dict[str, int | str]:
         """Enregistrer une catégorie pour un utilisateur.
 
         Args:
@@ -35,7 +37,9 @@ class RepositoryCategories:
         self._connexion.commit()
         return self.recuperer_categorie(identifiant_utilisateur, curseur.lastrowid)
 
-    def recuperer_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int) -> dict[str, int | str] | None:
+    def recuperer_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int
+    ) -> dict[str, int | str] | None:
         """Lire une catégorie appartenant à un utilisateur.
 
         Args:
@@ -51,7 +55,9 @@ class RepositoryCategories:
         ).fetchone()
         return dict(ligne) if ligne is not None else None
 
-    def recuperer_categories(self, identifiant_utilisateur: int) -> list[dict[str, int | str]]:
+    def recuperer_categories(
+        self, identifiant_utilisateur: int
+    ) -> list[dict[str, int | str]]:
         """Lire les catégories d'un utilisateur.
 
         Args:
@@ -66,7 +72,9 @@ class RepositoryCategories:
         ).fetchall()
         return [dict(ligne) for ligne in lignes]
 
-    def modifier_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int, nom: str) -> dict[str, int | str] | None:
+    def modifier_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int, nom: str
+    ) -> dict[str, int | str] | None:
         """Mettre à jour le nom d'une catégorie d'un utilisateur.
 
         Args:
@@ -86,7 +94,9 @@ class RepositoryCategories:
             return None
         return self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
 
-    def supprimer_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int) -> bool:
+    def supprimer_categorie(
+        self, identifiant_utilisateur: int, identifiant_categorie: int
+    ) -> bool:
         """Supprimer une catégorie appartenant à un utilisateur.
 
         Args:
@@ -103,7 +113,9 @@ class RepositoryCategories:
         self._connexion.commit()
         return curseur.rowcount > 0
 
-    def creer_sous_categorie(self, identifiant_categorie: int, nom: str) -> dict[str, int | str]:
+    def creer_sous_categorie(
+        self, identifiant_categorie: int, nom: str
+    ) -> dict[str, int | str]:
         """Enregistrer une sous-catégorie pour une catégorie.
 
         Args:
@@ -120,7 +132,9 @@ class RepositoryCategories:
         self._connexion.commit()
         return self.recuperer_sous_categorie(identifiant_categorie, curseur.lastrowid)
 
-    def recuperer_sous_categorie(self, identifiant_categorie: int, identifiant_sous_categorie: int) -> dict[str, int | str] | None:
+    def recuperer_sous_categorie(
+        self, identifiant_categorie: int, identifiant_sous_categorie: int
+    ) -> dict[str, int | str] | None:
         """Lire une sous-catégorie appartenant à une catégorie.
 
         Args:
@@ -136,7 +150,9 @@ class RepositoryCategories:
         ).fetchone()
         return dict(ligne) if ligne is not None else None
 
-    def recuperer_sous_categories(self, identifiant_categorie: int) -> list[dict[str, int | str]]:
+    def recuperer_sous_categories(
+        self, identifiant_categorie: int
+    ) -> list[dict[str, int | str]]:
         """Lire les sous-catégories d'une catégorie.
 
         Args:
@@ -151,7 +167,9 @@ class RepositoryCategories:
         ).fetchall()
         return [dict(ligne) for ligne in lignes]
 
-    def modifier_sous_categorie(self, identifiant_categorie: int, identifiant_sous_categorie: int, nom: str) -> dict[str, int | str] | None:
+    def modifier_sous_categorie(
+        self, identifiant_categorie: int, identifiant_sous_categorie: int, nom: str
+    ) -> dict[str, int | str] | None:
         """Mettre à jour le nom d'une sous-catégorie.
 
         Args:
@@ -169,9 +187,13 @@ class RepositoryCategories:
         self._connexion.commit()
         if curseur.rowcount == 0:
             return None
-        return self.recuperer_sous_categorie(identifiant_categorie, identifiant_sous_categorie)
+        return self.recuperer_sous_categorie(
+            identifiant_categorie, identifiant_sous_categorie
+        )
 
-    def supprimer_sous_categorie(self, identifiant_categorie: int, identifiant_sous_categorie: int) -> bool:
+    def supprimer_sous_categorie(
+        self, identifiant_categorie: int, identifiant_sous_categorie: int
+    ) -> bool:
         """Supprimer une sous-catégorie appartenant à une catégorie.
 
         Args:

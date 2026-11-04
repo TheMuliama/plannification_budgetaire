@@ -1,8 +1,8 @@
-
 """Écran des paramètres côté client."""
 
+from tkinter import messagebox, simpledialog
+
 import customtkinter as ctk
-from tkinter import messagebox
 
 
 class VueParametres(ctk.CTkFrame):
@@ -16,8 +16,8 @@ class VueParametres(ctk.CTkFrame):
         master,
         on_modifier_profil=None,
         on_changer_mot_de_passe=None,
-        on_changer_theme=None,
-        on_deconnexion=None
+        on_deconnexion=None,
+        on_supprimer_compte=None,
     ):
         super().__init__(master, fg_color="#F5F3EF")
 
@@ -25,6 +25,7 @@ class VueParametres(ctk.CTkFrame):
         self.on_modifier_profil = on_modifier_profil
         self.on_changer_mot_de_passe = on_changer_mot_de_passe
         self.on_deconnexion = on_deconnexion
+        self.on_supprimer_compte = on_supprimer_compte
 
         # Couleurs
         self.vert = "#00634F"
@@ -44,37 +45,23 @@ class VueParametres(ctk.CTkFrame):
         """Construire l'interface des paramètres."""
 
         # Conteneur défilant
-        self.conteneur = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent"
-        )
-        self.conteneur.pack(
-            fill="both",
-            expand=True,
-            padx=25,
-            pady=20
-        )
+        self.conteneur = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.conteneur.pack(fill="both", expand=True, padx=25, pady=20)
 
         # Titre
         ctk.CTkLabel(
             self.conteneur,
             text="Paramètres",
             font=("Arial", 26, "bold"),
-            text_color=self.texte
-        ).pack(
-            anchor="w",
-            pady=(0, 5)
-        )
+            text_color=self.texte,
+        ).pack(anchor="w", pady=(0, 5))
 
         ctk.CTkLabel(
             self.conteneur,
             text="Gérez vos informations personnelles et la sécurité de votre compte.",
             font=("Arial", 13),
-            text_color=self.gris
-        ).pack(
-            anchor="w",
-            pady=(0, 20)
-        )
+            text_color=self.gris,
+        ).pack(anchor="w", pady=(0, 20))
 
         self._creer_section_profil()
         self._creer_section_securite()
@@ -88,23 +75,13 @@ class VueParametres(ctk.CTkFrame):
             fg_color=self.blanc,
             corner_radius=12,
             border_width=1,
-            border_color="#E5E5E5"
+            border_color="#E5E5E5",
         )
-        carte.pack(
-            fill="x",
-            pady=(0, 15)
-        )
+        carte.pack(fill="x", pady=(0, 15))
 
         ctk.CTkLabel(
-            carte,
-            text=titre,
-            font=("Arial", 17, "bold"),
-            text_color=self.texte
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(18, 12)
-        )
+            carte, text=titre, font=("Arial", 17, "bold"), text_color=self.texte
+        ).pack(anchor="w", padx=20, pady=(18, 12))
 
         return carte
 
@@ -112,15 +89,8 @@ class VueParametres(ctk.CTkFrame):
         """Créer un champ de saisie avec son libellé."""
 
         ctk.CTkLabel(
-            parent,
-            text=titre,
-            font=("Arial", 12),
-            text_color=self.texte
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(5, 3)
-        )
+            parent, text=titre, font=("Arial", 12), text_color=self.texte
+        ).pack(anchor="w", padx=20, pady=(5, 3))
 
         champ = ctk.CTkEntry(
             parent,
@@ -128,43 +98,25 @@ class VueParametres(ctk.CTkFrame):
             corner_radius=8,
             fg_color="#FAFAFA",
             border_color="#DDDDDD",
-            show="*" if secret else ""
+            show="*" if secret else "",
         )
-        champ.pack(
-            fill="x",
-            padx=20,
-            pady=(0, 12)
-        )
+        champ.pack(fill="x", padx=20, pady=(0, 12))
 
         return champ
 
     def _creer_section_profil(self):
         """Construire la section du profil."""
 
-        carte = self._creer_carte(
-            "Informations personnelles"
-        )
+        carte = self._creer_carte("Informations personnelles")
 
-        self.champ_nom = self._creer_champ(
-            carte,
-            "Nom"
-        )
+        self.champ_nom = self._creer_champ(carte, "Nom")
 
-        self.champ_prenom = self._creer_champ(
-            carte,
-            "Prénom"
-        )
+        self.champ_prenom = self._creer_champ(carte, "Prénom")
 
-        self.champ_email = self._creer_champ(
-            carte,
-            "Adresse e-mail"
-        )
+        self.champ_email = self._creer_champ(carte, "Adresse e-mail")
 
         self.message_profil = ctk.CTkLabel(
-            carte,
-            text="",
-            text_color=self.rouge,
-            wraplength=450
+            carte, text="", text_color=self.rouge, wraplength=450
         )
         self.message_profil.pack(padx=20)
 
@@ -174,36 +126,24 @@ class VueParametres(ctk.CTkFrame):
             height=40,
             fg_color=self.vert,
             hover_color=self.vert_fonce,
-            command=self.enregistrer_profil
-        ).pack(
-            anchor="e",
-            padx=20,
-            pady=(5, 20)
-        )
+            command=self.enregistrer_profil,
+        ).pack(anchor="e", padx=20, pady=(5, 20))
 
     def _creer_section_securite(self):
         """Construire la section de sécurité."""
 
-        carte = self._creer_carte(
-            "Sécurité"
-        )
+        carte = self._creer_carte("Sécurité")
 
         self.champ_ancien_mdp = self._creer_champ(
-            carte,
-            "Mot de passe actuel",
-            secret=True
+            carte, "Mot de passe actuel", secret=True
         )
 
         self.champ_nouveau_mdp = self._creer_champ(
-            carte,
-            "Nouveau mot de passe",
-            secret=True
+            carte, "Nouveau mot de passe", secret=True
         )
 
         self.champ_confirmation = self._creer_champ(
-            carte,
-            "Confirmer le nouveau mot de passe",
-            secret=True
+            carte, "Confirmer le nouveau mot de passe", secret=True
         )
 
         self.afficher_mdp = ctk.CTkCheckBox(
@@ -213,19 +153,12 @@ class VueParametres(ctk.CTkFrame):
             text_color=self.gris,
             fg_color=self.vert,
             hover_color=self.vert,
-            command=self.toggle_password
+            command=self.toggle_password,
         )
-        self.afficher_mdp.pack(
-            anchor="w",
-            padx=20,
-            pady=5
-        )
+        self.afficher_mdp.pack(anchor="w", padx=20, pady=5)
 
         self.message_securite = ctk.CTkLabel(
-            carte,
-            text="",
-            text_color=self.rouge,
-            wraplength=450
+            carte, text="", text_color=self.rouge, wraplength=450
         )
         self.message_securite.pack(padx=20)
 
@@ -235,30 +168,20 @@ class VueParametres(ctk.CTkFrame):
             height=40,
             fg_color=self.vert,
             hover_color=self.vert_fonce,
-            command=self.changer_mot_de_passe
-        ).pack(
-            anchor="e",
-            padx=20,
-            pady=(5, 20)
-        )
+            command=self.changer_mot_de_passe,
+        ).pack(anchor="e", padx=20, pady=(5, 20))
 
     def _creer_section_compte(self):
         """Construire les actions du compte."""
 
-        carte = self._creer_carte(
-            "Compte"
-        )
+        carte = self._creer_carte("Compte")
 
         ctk.CTkLabel(
             carte,
             text="Terminer votre session sur MonBudget.",
             font=("Arial", 12),
-            text_color=self.gris
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(0, 15)
-        )
+            text_color=self.gris,
+        ).pack(anchor="w", padx=20, pady=(0, 15))
 
         ctk.CTkButton(
             carte,
@@ -266,18 +189,46 @@ class VueParametres(ctk.CTkFrame):
             height=40,
             fg_color=self.rouge,
             hover_color="#A73535",
-            command=self.deconnecter
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(0, 20)
-        )
+            command=self.deconnecter,
+        ).pack(anchor="w", padx=20, pady=(0, 20))
 
-    def actualiser(self, profil, theme="Clair"):
+        ctk.CTkButton(
+            carte,
+            text="Supprimer définitivement le compte",
+            height=40,
+            fg_color="#8B0000",
+            hover_color="#650000",
+            command=self.supprimer_compte,
+        ).pack(anchor="w", padx=20, pady=(0, 20))
+
+    def supprimer_compte(self):
+        """Confirmer la suppression et demander à nouveau le mot de passe."""
+        if not messagebox.askyesno(
+            "Suppression définitive",
+            "Supprimer le compte et toutes ses données ?",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        mot_de_passe = simpledialog.askstring(
+            "Confirmation",
+            "Saisissez votre mot de passe :",
+            show="*",
+            parent=self.winfo_toplevel(),
+        )
+        if not mot_de_passe:
+            return
+        try:
+            self.on_supprimer_compte(mot_de_passe)
+        except (ConnectionError, OSError, ValueError) as erreur:
+            messagebox.showerror(
+                "Suppression impossible", str(erreur), parent=self.winfo_toplevel()
+            )
+
+    def actualiser(self, profil):
         """Actualiser les données du profil.
 
-        profil contient :
-            nom, prenom, email.
+        Args:
+            profil: Nom, prénom et adresse du compte affiché.
         """
 
         self.profil = dict(profil)
@@ -285,15 +236,12 @@ class VueParametres(ctk.CTkFrame):
         champs = [
             (self.champ_nom, "nom"),
             (self.champ_prenom, "prenom"),
-            (self.champ_email, "email")
+            (self.champ_email, "email"),
         ]
 
         for champ, cle in champs:
             champ.delete(0, "end")
-            champ.insert(
-                0,
-                str(self.profil.get(cle, ""))
-            )
+            champ.insert(0, str(self.profil.get(cle, "")))
 
         self.message_profil.configure(text="")
         self.message_securite.configure(text="")
@@ -307,41 +255,29 @@ class VueParametres(ctk.CTkFrame):
 
         if not nom or not prenom or not email:
             self.message_profil.configure(
-                text="Veuillez remplir tous les champs.",
-                text_color=self.rouge
+                text="Veuillez remplir tous les champs.", text_color=self.rouge
             )
             return
 
         # Validation simple du format
-        if (
-            "@" not in email
-            or "." not in email.split("@")[-1]
-            or " " in email
-        ):
+        if "@" not in email or "." not in email.split("@")[-1] or " " in email:
             self.message_profil.configure(
-                text="Adresse e-mail invalide.",
-                text_color=self.rouge
+                text="Adresse e-mail invalide.", text_color=self.rouge
             )
             return
 
         if self.on_modifier_profil is None:
             self.message_profil.configure(
-                text="Modification du profil non configurée.",
-                text_color=self.rouge
+                text="Modification du profil non configurée.", text_color=self.rouge
             )
             return
 
-        donnees = {
-            "nom": nom,
-            "prenom": prenom,
-            "email": email
-        }
+        donnees = {"nom": nom, "prenom": prenom, "email": email}
 
         self.on_modifier_profil(donnees)
 
         self.message_profil.configure(
-            text="Demande de modification transmise.",
-            text_color=self.vert
+            text="Demande de modification transmise.", text_color=self.vert
         )
 
     def toggle_password(self):
@@ -364,47 +300,44 @@ class VueParametres(ctk.CTkFrame):
 
         if not ancien or not nouveau or not confirmation:
             self.message_securite.configure(
-                text="Veuillez remplir tous les champs.",
-                text_color=self.rouge
+                text="Veuillez remplir tous les champs.", text_color=self.rouge
             )
             return
 
         if len(nouveau) < 8:
             self.message_securite.configure(
                 text="Le mot de passe doit contenir au moins 8 caractères.",
-                text_color=self.rouge
+                text_color=self.rouge,
             )
             return
 
         if nouveau != confirmation:
             self.message_securite.configure(
-                text="Les mots de passe ne correspondent pas.",
-                text_color=self.rouge
+                text="Les mots de passe ne correspondent pas.", text_color=self.rouge
             )
             return
 
         if ancien == nouveau:
             self.message_securite.configure(
                 text="Le nouveau mot de passe doit être différent.",
-                text_color=self.rouge
+                text_color=self.rouge,
             )
             return
 
         if self.on_changer_mot_de_passe is None:
             self.message_securite.configure(
-                text="Changement de mot de passe non configuré.",
-                text_color=self.rouge
+                text="Changement de mot de passe non configuré.", text_color=self.rouge
             )
             return
 
-        self.on_changer_mot_de_passe(
-            ancien,
-            nouveau
-        )
+        try:
+            self.on_changer_mot_de_passe(ancien, nouveau)
+        except (ConnectionError, OSError, ValueError) as erreur:
+            self.message_securite.configure(text=str(erreur), text_color=self.rouge)
+            return
 
         self.message_securite.configure(
-            text="Demande de changement transmise.",
-            text_color=self.vert
+            text="Demande de changement transmise.", text_color=self.vert
         )
 
         # Effacer les champs sensibles
@@ -418,7 +351,7 @@ class VueParametres(ctk.CTkFrame):
         confirmation = messagebox.askyesno(
             "Déconnexion",
             "Voulez-vous vraiment vous déconnecter ?",
-            parent=self.winfo_toplevel()
+            parent=self.winfo_toplevel(),
         )
 
         if not confirmation:
@@ -430,27 +363,26 @@ class VueParametres(ctk.CTkFrame):
             messagebox.showwarning(
                 "Action indisponible",
                 "La déconnexion n'est pas configurée.",
-                parent=self.winfo_toplevel()
+                parent=self.winfo_toplevel(),
             )
 
     def afficher_erreur(self, section, texte):
-        """Afficher une erreur provenant de l'extérieur."""
+        """Afficher une erreur dans une section des paramètres.
 
-        messages = {
-            "profil": self.message_profil,
-            "securite": self.message_securite
-        }
+        Args:
+            section: Section ``profil`` ou ``securite`` à mettre à jour.
+            texte: Message d'erreur à afficher.
+        """
+
+        messages = {"profil": self.message_profil, "securite": self.message_securite}
 
         if section in messages:
-            messages[section].configure(
-                text=texte,
-                text_color=self.rouge
-            )
+            messages[section].configure(text=texte, text_color=self.rouge)
 
     def vider(self):
         """Réinitialiser les informations affichées."""
 
-        self.actualiser({}, "Clair")
+        self.actualiser({})
 
         self.champ_ancien_mdp.delete(0, "end")
         self.champ_nouveau_mdp.delete(0, "end")

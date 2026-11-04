@@ -1,7 +1,7 @@
-
 """Écran d'inscription côté client."""
 
 import re
+
 import customtkinter as ctk
 
 
@@ -36,13 +36,9 @@ class VueInscription(ctk.CTkFrame):
             corner_radius=15,
             fg_color=self.blanc,
             border_width=1,
-            border_color="#E5E5E5"
+            border_color="#E5E5E5",
         )
-        self.carte.place(
-            relx=0.5,
-            rely=0.5,
-            anchor="center"
-        )
+        self.carte.place(relx=0.5, rely=0.5, anchor="center")
         self.carte.pack_propagate(False)
 
         # Logo
@@ -50,7 +46,7 @@ class VueInscription(ctk.CTkFrame):
             self.carte,
             text="MonBudget",
             font=("Arial", 27, "bold"),
-            text_color=self.vert
+            text_color=self.vert,
         ).pack(pady=(25, 10))
 
         # Titre
@@ -58,42 +54,30 @@ class VueInscription(ctk.CTkFrame):
             self.carte,
             text="Créer un compte",
             font=("Arial", 24, "bold"),
-            text_color="#172326"
+            text_color="#172326",
         ).pack(pady=(5, 5))
 
         ctk.CTkLabel(
             self.carte,
             text="Commencez à gérer votre budget.",
             font=("Arial", 12),
-            text_color="gray"
+            text_color="gray",
         ).pack(pady=(0, 20))
 
         # Champ nom
-        self.nom = self._creer_champ(
-            "Nom"
-        )
+        self.nom = self._creer_champ("Nom")
 
         # Champ prénom
-        self.prenom = self._creer_champ(
-            "Prénom"
-        )
+        self.prenom = self._creer_champ("Prénom")
 
         # Champ email
-        self.email = self._creer_champ(
-            "Adresse e-mail"
-        )
+        self.email = self._creer_champ("Adresse e-mail")
 
         # Champ mot de passe
-        self.password = self._creer_champ(
-            "Mot de passe",
-            secret=True
-        )
+        self.password = self._creer_champ("Mot de passe", secret=True)
 
         # Confirmation
-        self.confirmation = self._creer_champ(
-            "Confirmer le mot de passe",
-            secret=True
-        )
+        self.confirmation = self._creer_champ("Confirmer le mot de passe", secret=True)
 
         # Afficher les mots de passe
         self.afficher = ctk.CTkCheckBox(
@@ -103,17 +87,13 @@ class VueInscription(ctk.CTkFrame):
             text_color="#555555",
             fg_color=self.vert,
             hover_color=self.vert,
-            command=self.toggle_password
+            command=self.toggle_password,
         )
         self.afficher.pack(pady=(10, 5))
 
         # Message d'information
         self.message = ctk.CTkLabel(
-            self.carte,
-            text="",
-            font=("Arial", 12),
-            text_color="red",
-            wraplength=350
+            self.carte, text="", font=("Arial", 12), text_color="red", wraplength=350
         )
         self.message.pack(pady=5)
 
@@ -127,7 +107,7 @@ class VueInscription(ctk.CTkFrame):
             fg_color=self.vert,
             hover_color="#004D3E",
             font=("Arial", 14, "bold"),
-            command=self.inscrire
+            command=self.inscrire,
         )
         self.bouton_inscription.pack(pady=(10, 10))
 
@@ -138,7 +118,7 @@ class VueInscription(ctk.CTkFrame):
             fg_color="transparent",
             hover_color=self.beige,
             text_color=self.vert,
-            command=self.retour_connexion
+            command=self.retour_connexion,
         ).pack(pady=5)
 
     def _creer_champ(self, placeholder, secret=False):
@@ -152,7 +132,7 @@ class VueInscription(ctk.CTkFrame):
             show="*" if secret else "",
             corner_radius=8,
             fg_color="#FAFAFA",
-            border_color="#DDDDDD"
+            border_color="#DDDDDD",
         )
         champ.pack(pady=6)
 
@@ -178,36 +158,25 @@ class VueInscription(ctk.CTkFrame):
         confirmation = self.confirmation.get()
 
         # Vérification des champs vides
-        if not all([
-            nom, prenom, email,
-            password, confirmation
-        ]):
-            self.afficher_erreur(
-                "Veuillez remplir tous les champs."
-            )
+        if not all([nom, prenom, email, password, confirmation]):
+            self.afficher_erreur("Veuillez remplir tous les champs.")
             return
 
         # Vérification du format email
         format_email = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
         if not re.fullmatch(format_email, email):
-            self.afficher_erreur(
-                "Veuillez saisir une adresse e-mail valide."
-            )
+            self.afficher_erreur("Veuillez saisir une adresse e-mail valide.")
             return
 
         # Vérification du mot de passe
         if len(password) < 8:
-            self.afficher_erreur(
-                "Le mot de passe doit contenir au moins 8 caractères."
-            )
+            self.afficher_erreur("Le mot de passe doit contenir au moins 8 caractères.")
             return
 
         # Vérification de la confirmation
         if password != confirmation:
-            self.afficher_erreur(
-                "Les mots de passe ne correspondent pas."
-            )
+            self.afficher_erreur("Les mots de passe ne correspondent pas.")
             return
 
         # Effacer les anciens messages
@@ -215,16 +184,12 @@ class VueInscription(ctk.CTkFrame):
 
         # Transmettre les données à la logique externe
         if self.on_register:
-            self.on_register(
-                nom,
-                prenom,
-                email,
-                password
-            )
+            try:
+                self.on_register(nom, prenom, email, password)
+            except (ConnectionError, OSError, ValueError) as erreur:
+                self.afficher_erreur(str(erreur))
         else:
-            self.afficher_erreur(
-                "Service d'inscription non configuré."
-            )
+            self.afficher_erreur("Service d'inscription non configuré.")
 
     def retour_connexion(self):
         """Demander le retour à l'écran de connexion."""
@@ -232,39 +197,39 @@ class VueInscription(ctk.CTkFrame):
         if self.on_login:
             self.on_login()
         else:
-            self.afficher_erreur(
-                "Page de connexion non configurée."
-            )
+            self.afficher_erreur("Page de connexion non configurée.")
 
     def afficher_erreur(self, texte):
-        """Afficher un message d'erreur."""
+        """Afficher un message d'erreur.
 
-        self.message.configure(
-            text=texte,
-            text_color="red"
-        )
+        Args:
+            texte: Message à présenter sous le formulaire.
+        """
+
+        self.message.configure(text=texte, text_color="red")
 
     def afficher_message(self, texte):
-        """Afficher un message d'information."""
+        """Afficher un message d'information.
 
-        self.message.configure(
-            text=texte,
-            text_color=self.vert
-        )
+        Args:
+            texte: Message à présenter sous le formulaire.
+        """
+
+        self.message.configure(text=texte, text_color=self.vert)
 
     def definir_chargement(self, chargement):
-        """Gérer l'état du bouton d'inscription."""
+        """Mettre le formulaire en état de chargement.
+
+        Args:
+            chargement: Indique si une inscription est en cours.
+        """
 
         if chargement:
             self.bouton_inscription.configure(
-                state="disabled",
-                text="Inscription en cours..."
+                state="disabled", text="Inscription en cours..."
             )
         else:
-            self.bouton_inscription.configure(
-                state="normal",
-                text="Créer mon compte"
-            )
+            self.bouton_inscription.configure(state="normal", text="Créer mon compte")
 
     def vider_formulaire(self):
         """Réinitialiser les champs du formulaire."""

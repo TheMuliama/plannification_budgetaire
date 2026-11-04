@@ -1,6 +1,9 @@
 """Service de gestion du budget mensuel."""
 
+from math import isfinite
 from typing import Any
+
+from persistance.repositories.budgets import RepositoryBudgets
 
 
 class GestionnaireBudget:
@@ -11,6 +14,9 @@ class GestionnaireBudget:
     projections futures.
     """
 
+    def __init__(self, repository: RepositoryBudgets) -> None:
+        self._repository = repository
+
     def creer_budget(self, budget: dict[str, Any]) -> dict[str, Any]:
         """Créer un budget mensuel structuré.
 
@@ -20,9 +26,14 @@ class GestionnaireBudget:
         Returns:
             Le budget créé.
         """
-        pass
+        return self._repository.creer_budget(**self._valider(budget))
 
-    def modifier_budget(self, identifiant_budget: int, budget: dict[str, Any]) -> dict[str, Any]:
+    def modifier_budget(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_budget: int,
+        budget: dict[str, Any],
+    ) -> dict[str, Any]:
         """Modifier un budget mensuel.
 
         Args:
@@ -32,9 +43,26 @@ class GestionnaireBudget:
         Returns:
             Le budget modifié.
         """
-        pass
+        donnees = self._valider({**budget, "utilisateur_id": identifiant_utilisateur})
+        resultat = self._repository.modifier_budget(
+            identifiant_utilisateur,
+            identifiant_budget,
+            **{
+                cle: valeur
+                for cle, valeur in donnees.items()
+                if cle != "utilisateur_id"
+            },
+        )
+        if resultat is None:
+            raise ValueError("Budget introuvable pour cet utilisateur.")
+        return resultat
 
-    def consulter_budget(self, identifiant_utilisateur: int) -> dict[str, Any]:
+    def consulter_budget(
+        self,
+        identifiant_utilisateur: int,
+        annee: int | None = None,
+        mois: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Consulter le budget mensuel d'un utilisateur.
 
         Args:
@@ -43,16 +71,45 @@ class GestionnaireBudget:
         Returns:
             Le budget mensuel structuré.
         """
-        pass
+        return self._repository.consulter_budgets(identifiant_utilisateur, annee, mois)
 
-    def gerer_allocation(self, identifiant_budget: int, allocation: dict[str, Any]) -> dict[str, Any]:
-        """Gérer une allocation par catégorie ou sous-catégorie.
+    def supprimer_budget(
+        self, identifiant_utilisateur: int, identifiant_budget: int
+    ) -> None:
+        """Supprimer un budget appartenant à un utilisateur.
 
         Args:
-            identifiant_budget: Identifiant du budget concerné.
-            allocation: Informations de l'allocation à gérer.
+            identifiant_utilisateur: Identifiant du propriétaire du budget.
+            identifiant_budget: Identifiant du budget à supprimer.
 
-        Returns:
-            L'allocation enregistrée.
+        Raises:
+            ValueError: Si le budget n'appartient pas à l'utilisateur.
         """
-        pass
+        if not self._repository.supprimer_budget(
+            identifiant_utilisateur, identifiant_budget
+        ):
+            raise ValueError("Budget introuvable pour cet utilisateur.")
+
+    @staticmethod
+    def _valider(budget: dict[str, Any]) -> dict[str, Any]:
+        try:
+            donnees = {
+                "utilisateur_id": int(budget["utilisateur_id"]),
+                "annee": int(budget["annee"]),
+                "mois": int(budget["mois"]),
+                "categorie_id": int(budget["categorie_id"]),
+                "sous_categorie_id": None
+                if budget.get("sous_categorie_id") is None
+                else int(budget["sous_categorie_id"]),
+                "montant_alloue": float(budget["montant_alloue"]),
+                "obligatoire": bool(budget.get("obligatoire", False)),
+            }
+        except (KeyError, TypeError, ValueError) as erreur:
+            raise ValueError("Les informations du budget sont incomplètes.") from erreur
+        if donnees["utilisateur_id"] <= 0 or donnees["categorie_id"] <= 0:
+            raise ValueError("Le propriétaire ou la catégorie est invalide.")
+        if donnees["annee"] < 2000 or not 1 <= donnees["mois"] <= 12:
+            raise ValueError("La période mensuelle du budget est invalide.")
+        if not isfinite(donnees["montant_alloue"]) or donnees["montant_alloue"] < 0:
+            raise ValueError("Le montant alloué est invalide.")
+        return donnees
