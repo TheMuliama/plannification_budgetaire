@@ -4,6 +4,9 @@
 
 ### Added
 
+- Ajouter la gestion des dépenses prévues et réalisées, reliées à un budget et
+  isolées par utilisateur.
+
 - Ajouter la gestion persistante des budgets mensuels, avec validation des
   catégories et isolation des données de chaque utilisateur.
 
