@@ -19,6 +19,10 @@ def gestionnaire_categories() -> GestionnaireCategories:
     connexion = Database().connecter(":memory:")
     schema = Path("persistance/schema.sql").read_text(encoding="utf-8")
     connexion.executescript(schema)
+    connexion.executemany(
+        "INSERT INTO utilisateurs (identifiant, mot_de_passe) VALUES (?, ?)",
+        (("utilisateur-1", "hachage-fictif-1"), ("utilisateur-2", "hachage-fictif-2")),
+    )
     yield GestionnaireCategories(RepositoryCategories(connexion))
     connexion.close()
 
@@ -106,3 +110,16 @@ def test_isoler_les_categories_par_utilisateur(gestionnaire_categories: Gestionn
     assert gestionnaire_categories.recuperer_categories(2) == [categorie_utilisateur_deux]
     with pytest.raises(ValueError):
         gestionnaire_categories.recuperer_categorie(2, categorie_utilisateur_un["id"])
+
+
+def test_refuser_un_nom_vide(gestionnaire_categories: GestionnaireCategories) -> None:
+    """Vérifier qu'une catégorie doit posséder un nom exploitable."""
+    with pytest.raises(ValueError, match="obligatoire"):
+        gestionnaire_categories.creer_categorie(1, "   ")
+
+
+def test_normaliser_le_nom(gestionnaire_categories: GestionnaireCategories) -> None:
+    """Retirer les espaces inutiles autour du nom."""
+    categorie = gestionnaire_categories.creer_categorie(1, "  Alimentation  ")
+
+    assert categorie["nom"] == "Alimentation"

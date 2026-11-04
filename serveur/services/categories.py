@@ -29,7 +29,10 @@ class GestionnaireCategories:
         Returns:
             La catégorie créée.
         """
-        return self._repository.creer_categorie(identifiant_utilisateur, nom)
+        return self._repository.creer_categorie(
+            identifiant_utilisateur,
+            self._valider_nom(nom),
+        )
 
     def recuperer_categorie(self, identifiant_utilisateur: int, identifiant_categorie: int) -> dict[str, int | str]:
         """Récupérer une catégorie appartenant à un utilisateur.
@@ -74,7 +77,11 @@ class GestionnaireCategories:
         Raises:
             ValueError: Si la catégorie n'existe pas pour cet utilisateur.
         """
-        categorie = self._repository.modifier_categorie(identifiant_utilisateur, identifiant_categorie, nom)
+        categorie = self._repository.modifier_categorie(
+            identifiant_utilisateur,
+            identifiant_categorie,
+            self._valider_nom(nom),
+        )
         if categorie is None:
             raise ValueError("Catégorie introuvable pour cet utilisateur.")
         return categorie
@@ -111,7 +118,10 @@ class GestionnaireCategories:
             ValueError: Si la catégorie n'existe pas pour cet utilisateur.
         """
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
-        return self._repository.creer_sous_categorie(identifiant_categorie, nom)
+        return self._repository.creer_sous_categorie(
+            identifiant_categorie,
+            self._valider_nom(nom),
+        )
 
     def recuperer_sous_categories(self, identifiant_utilisateur: int, identifiant_categorie: int) -> list[dict[str, int | str]]:
         """Récupérer les sous-catégories d'une catégorie de l'utilisateur.
@@ -145,7 +155,11 @@ class GestionnaireCategories:
             ValueError: Si la catégorie ou la sous-catégorie est introuvable.
         """
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
-        sous_categorie = self._repository.modifier_sous_categorie(identifiant_categorie, identifiant_sous_categorie, nom)
+        sous_categorie = self._repository.modifier_sous_categorie(
+            identifiant_categorie,
+            identifiant_sous_categorie,
+            self._valider_nom(nom),
+        )
         if sous_categorie is None:
             raise ValueError("Sous-catégorie introuvable pour cette catégorie.")
         return sous_categorie
@@ -168,3 +182,10 @@ class GestionnaireCategories:
         supprimee = self._repository.supprimer_sous_categorie(identifiant_categorie, identifiant_sous_categorie)
         if not supprimee:
             raise ValueError("Sous-catégorie introuvable pour cette catégorie.")
+
+    @staticmethod
+    def _valider_nom(nom: str) -> str:
+        """Nettoyer un nom de catégorie et refuser les valeurs vides."""
+        if not isinstance(nom, str) or not nom.strip():
+            raise ValueError("Le nom de la catégorie est obligatoire.")
+        return nom.strip()
