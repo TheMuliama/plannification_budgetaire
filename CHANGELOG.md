@@ -4,6 +4,9 @@
 
 ### Added
 
+- Ajouter la gestion et le suivi des objectifs d'épargne, avec calcul d'un plan
+  périodique et propositions de réajustement.
+
 - Ajouter la gestion des dépenses prévues et réalisées, reliées à un budget et
   isolées par utilisateur.
 
