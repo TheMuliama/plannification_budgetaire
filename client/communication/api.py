@@ -12,7 +12,7 @@ class ErreurServeur(ValueError):
 class ApiClient:
     """Exposer les actions du serveur à l'interface graphique."""
 
-    def __init__(self, adresse: str = "127.0.0.1", port: int = 8765) -> None:
+    def __init__(self, adresse: str = "127.0.0.1", port: int = 8766) -> None:
         self._adresse = adresse
         self._port = port
         self._client = ClientSocket()

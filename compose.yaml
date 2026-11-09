@@ -1,0 +1,12 @@
+services:
+  serveur:
+    build: .
+    container_name: budget-server
+    ports:
+      - "127.0.0.1:8766:8765"
+    volumes:
+      - budget_data:/app/persistance/data
+    restart: unless-stopped
+
+volumes:
+  budget_data:
