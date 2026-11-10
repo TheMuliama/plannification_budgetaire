@@ -48,7 +48,7 @@ appimagetool.AppImage
 *.sqlite3
 
 # Autoriser uniquement la base de démonstration
-!persistance/data/demo.db
+!persistance/data/budget.db
 
 # Autres données locales
 persistance/data/factures/
