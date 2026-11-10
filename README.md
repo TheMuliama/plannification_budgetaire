@@ -2,11 +2,14 @@
 
 Application lourde de planification budgétaire destinée principalement aux étudiants.
 
-## Objectif actuel
+## État actuel
 
-L'objectif prioritaire est de terminer un **MVP fonctionnel avant le jeudi 5 novembre 2026 à 22h00**.
+Le MVP est fonctionnel. Son architecture métier a été réalignée sur les neuf
+modules définis au début du projet : les calculs sont réalisés côté serveur,
+le client se limite à la saisie et à la présentation, et les repositories se
+limitent aux opérations SQLite.
 
-Le MVP doit permettre à un utilisateur de :
+Le MVP permet à un utilisateur de :
 
 - créer et gérer son compte ;
 - gérer ses catégories et sous-catégories ;
@@ -68,8 +71,32 @@ python client/main.py
 ```
 
 Le serveur écoute par défaut sur `127.0.0.1:8765` et initialise la base
-`persistance/data/budget.db`. Les fichiers SQLite de ce dossier sont ignorés
-par Git afin de ne pas publier de données personnelles.
+`persistance/data/budget.db`. Les nouvelles bases SQLite de ce dossier sont
+ignorées par Git afin de ne pas publier de données personnelles. Le dépôt peut
+néanmoins fournir un instantané de démonstration explicitement suivi, qui doit
+contenir uniquement des données fictives.
+
+## Installation du serveur avec Docker
+
+Construire et démarrer uniquement le serveur :
+
+```bash
+docker compose up --build -d
+```
+
+Le port `8765` du serveur est alors disponible uniquement sur l'interface
+locale de la machine. Les données SQLite sont conservées dans le volume Docker
+`budget_data`. Le client graphique reste lancé depuis l'environnement local :
+
+```bash
+python client/main.py
+```
+
+Arrêter le serveur sans supprimer ses données :
+
+```bash
+docker compose down
+```
 
 ---
 
@@ -88,23 +115,59 @@ flowchart TD
     Projection["Moteur de projection"]
 
     Categories --> Depenses
+    Categories --> Budget
     Revenus --> Budget
     Epargne --> Budget
     Depenses --> CalculBudget
     Budget --> CalculBudget
     Revenus --> CalculBudget
+    Epargne --> CalculBudget
 
     CalculBudget --> Alertes
     CalculBudget --> Projection
     Depenses --> Projection
     Epargne --> Projection
+    Projection --> Alertes
 ```
 
-Ces relations représentent les dépendances métier principales. Elles ne signifient pas nécessairement que les modules doivent être développés strictement les uns après les autres.
+Ces relations représentent les dépendances métier principales. Elles ne
+signifient pas nécessairement que les modules doivent être développés
+strictement les uns après les autres.
+
+| Module | Rôle effectif | Dépendances métier |
+| --- | --- | --- |
+| `GestionnaireUtilisateurs` | Comptes, authentification et mots de passe | Aucune |
+| `GestionnaireCategories` | Catégories, sous-catégories et validation des classements | Aucune |
+| `GestionnaireRevenus` | Revenus prévus/reçus et totaux par période | Aucune |
+| `GestionnaireObjectifsEpargne` | Objectifs, versements, plans, écarts et scénarios | Aucune |
+| `GestionnaireBudget` | Construction du budget mensuel, allocations et épargne prévue | Revenus, objectifs, catégories |
+| `GestionnaireDepenses` | Dépenses prévues/réalisées et validation de leurs rattachements | Catégories, budget |
+| `CalculateurBudget` | Solde, consommation, budget flexible, enveloppes et capacité d'épargne | Budget, revenus, dépenses, objectifs |
+| `MoteurProjection` | Impact futur des dépenses prévues sur le budget et l'épargne | Calculateur, dépenses, objectifs |
+| `GestionnaireAlertes` | Alertes de consommation à partir de 80 % et risques projetés | Calculateur, projection |
+
+`GestionnaireSessions` reste un composant de sécurité et non un module métier.
+Les anciens services parallèles de solde et d'analyse d'épargne ont été
+absorbés par `CalculateurBudget`.
+
+Le serveur expose notamment les états calculés avec `budgets.etat`,
+`dashboard.obtenir`, `alertes.lister` et `projection.simuler`. Les séries de
+revenus et de dépenses récurrentes sont développées côté serveur afin qu'un
+client ne puisse pas contourner les validations financières.
+
+La suite automatisée couvre les services, la persistance, le protocole et les
+principaux parcours intégrés. Elle s'exécute avec :
+
+```bash
+python -m pytest -q
+```
 
 ---
 
-# Roadmap du MVP
+# Roadmap historique du MVP
+
+Cette roadmap décrit la planification initiale. L'état effectif et les
+dépendances actuellement implémentées sont décrits dans la section précédente.
 
 ## Gantt
 

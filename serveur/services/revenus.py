@@ -5,13 +5,14 @@ from math import isfinite
 from typing import Any
 
 from persistance.repositories.revenus import RepositoryRevenus
+from serveur.services.recurrence import generer_dates_recurrence
 
 
 class GestionnaireRevenus:
     """Gérer les revenus prévisionnels et réellement reçus.
 
-    Cette classe enregistre et consulte les revenus sans implémenter leurs
-    calculs.
+    Cette classe enregistre, consulte et totalise les revenus. Les autres
+    modules n'ont ainsi pas à connaître la structure de persistance.
     """
 
     CATEGORIES = frozenset({"Salaire", "Remboursement", "Cadeau", "Prime", "Autre"})
@@ -37,6 +38,44 @@ class GestionnaireRevenus:
         assert revenu_enregistre is not None
         return revenu_enregistre
 
+    def ajouter_revenus_recurrents(
+        self, identifiant_utilisateur: int, revenu: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Créer toutes les occurrences d'un revenu récurrent.
+
+        Args:
+            identifiant_utilisateur: Identifiant du propriétaire des revenus.
+            revenu: Revenu commun et paramètres de récurrence.
+
+        Returns:
+            Les revenus créés dans l'ordre chronologique.
+        """
+        try:
+            debut = date.fromisoformat(revenu["date"])
+            fin = (
+                date.fromisoformat(revenu["date_fin"])
+                if revenu.get("date_fin")
+                else None
+            )
+        except (KeyError, TypeError, ValueError) as erreur:
+            raise ValueError("Les dates de récurrence sont invalides.") from erreur
+        occurrences = generer_dates_recurrence(
+            debut, revenu.get("frequence", "Aucune"), fin
+        )
+        aujourd_hui = date.today()
+        donnees = [
+            self._valider_revenu(
+                {
+                    **revenu,
+                    "utilisateur_id": identifiant_utilisateur,
+                    "date": occurrence.isoformat(),
+                    "statut": "recu" if occurrence <= aujourd_hui else "prevu",
+                }
+            )
+            for occurrence in occurrences
+        ]
+        return [self.ajouter_revenu(element) for element in donnees]
+
     def modifier_revenu(
         self,
         identifiant_utilisateur: int,
@@ -52,8 +91,22 @@ class GestionnaireRevenus:
         Returns:
             Le revenu modifié.
         """
+        statut = revenu.get("statut")
+        if statut is None:
+            try:
+                statut = (
+                    "recu"
+                    if date.fromisoformat(revenu["date"]) <= date.today()
+                    else "prevu"
+                )
+            except (KeyError, TypeError, ValueError) as erreur:
+                raise ValueError("La date du revenu est invalide.") from erreur
         donnees = self._valider_revenu(
-            {**revenu, "utilisateur_id": identifiant_utilisateur}
+            {
+                **revenu,
+                "utilisateur_id": identifiant_utilisateur,
+                "statut": statut,
+            }
         )
         modifie = self._repository.modifier_revenu(
             identifiant_utilisateur,
@@ -120,6 +173,32 @@ class GestionnaireRevenus:
             debut,
             fin,
             statut,
+        )
+
+    def totaliser_revenus(
+        self,
+        identifiant_utilisateur: int,
+        debut: str | None = None,
+        fin: str | None = None,
+        statut: str | None = None,
+    ) -> float:
+        """Totaliser les revenus correspondant à une période et un statut.
+
+        Args:
+            identifiant_utilisateur: Identifiant du propriétaire des revenus.
+            debut: Date de début facultative au format ISO.
+            fin: Date de fin facultative au format ISO.
+            statut: Statut ``prevu`` ou ``recu`` facultatif.
+
+        Returns:
+            Le total arrondi des revenus correspondant aux filtres.
+        """
+        self.consulter_revenus(identifiant_utilisateur, debut, fin, statut)
+        return round(
+            self._repository.total_revenus(
+                identifiant_utilisateur, debut, fin, statut
+            ),
+            2,
         )
 
     @classmethod

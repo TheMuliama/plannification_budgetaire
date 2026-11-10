@@ -6,7 +6,13 @@ import pytest
 
 from persistance.database import Database
 from persistance.repositories.budgets import RepositoryBudgets
+from persistance.repositories.categories import RepositoryCategories
+from persistance.repositories.objectifs_epargne import RepositoryObjectifsEpargne
+from persistance.repositories.revenus import RepositoryRevenus
 from serveur.services.budget import GestionnaireBudget
+from serveur.services.categories import GestionnaireCategories
+from serveur.services.objectifs_epargne import GestionnaireObjectifsEpargne
+from serveur.services.revenus import GestionnaireRevenus
 
 
 @pytest.fixture
@@ -21,7 +27,12 @@ def gestionnaire_budget() -> GestionnaireBudget:
         "INSERT INTO categories (utilisateur_id,nom) VALUES (?,?)",
         ((1, "Alimentation"), (2, "Privée")),
     )
-    yield GestionnaireBudget(RepositoryBudgets(connexion))
+    categories = GestionnaireCategories(RepositoryCategories(connexion))
+    revenus = GestionnaireRevenus(RepositoryRevenus(connexion))
+    objectifs = GestionnaireObjectifsEpargne(RepositoryObjectifsEpargne(connexion))
+    yield GestionnaireBudget(
+        RepositoryBudgets(connexion), revenus, objectifs, categories
+    )
     connexion.close()
 
 

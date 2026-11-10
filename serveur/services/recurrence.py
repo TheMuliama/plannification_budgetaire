@@ -1,4 +1,4 @@
-"""Calcul pur des dates d'une série de transactions récurrentes."""
+"""Outils partagés pour créer les occurrences récurrentes côté serveur."""
 
 from calendar import monthrange
 from datetime import date, timedelta
@@ -6,16 +6,18 @@ from datetime import date, timedelta
 FREQUENCES = ("Aucune", "Hebdomadaire", "Mensuelle", "Annuelle")
 
 
-def dates_recurrentes(debut: date, frequence: str, fin: date | None) -> list[date]:
-    """Calculer les occurrences inclusives d'une transaction récurrente.
+def generer_dates_recurrence(
+    debut: date, frequence: str, fin: date | None
+) -> list[date]:
+    """Calculer les dates inclusives d'une série de transactions.
 
     Args:
-        debut: Date de la première transaction.
-        frequence: Fréquence hebdomadaire, mensuelle, annuelle ou unique.
+        debut: Date de la première occurrence.
+        frequence: Fréquence choisie par l'utilisateur.
         fin: Dernière date autorisée pour la série.
 
     Returns:
-        Les dates des transactions, dans la limite de 120 occurrences.
+        Les dates de la série, limitées à 120 occurrences.
 
     Raises:
         ValueError: Si la fréquence ou la période est invalide.
@@ -37,10 +39,12 @@ def dates_recurrentes(debut: date, frequence: str, fin: date | None) -> list[dat
         if frequence == "Hebdomadaire":
             courante += timedelta(days=7)
         elif frequence == "Mensuelle":
-            mois = courante.month + 1
-            annee = courante.year + (mois - 1) // 12
-            mois = (mois - 1) % 12 + 1
-            courante = date(annee, mois, min(jour_ancrage, monthrange(annee, mois)[1]))
+            prochain_mois = courante.month + 1
+            annee = courante.year + (prochain_mois - 1) // 12
+            mois = (prochain_mois - 1) % 12 + 1
+            courante = date(
+                annee, mois, min(jour_ancrage, monthrange(annee, mois)[1])
+            )
         else:
             annee = courante.year + 1
             courante = date(

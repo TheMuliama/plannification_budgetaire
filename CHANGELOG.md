@@ -2,7 +2,27 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Réaligner l'architecture sur les neuf modules métier d'origine : le
+  calculateur centralise désormais le solde, les états budgétaires et la
+  capacité d'épargne, tandis que les projections et alertes consomment ces
+  états côté serveur.
+
+- Déplacer la génération des transactions récurrentes vers le serveur et
+  rattacher chaque dépense au budget correspondant à son propre mois.
+
+- Limiter le client à la saisie et à la présentation des tableaux de bord,
+  budgets et alertes déjà calculés par les services métier.
+
+- Aligner le port publié par Docker Compose sur le port `8765` utilisé par le
+  client et documenter l'installation du serveur conteneurisé.
+
 ### Added
+
+- Exposer les états mensuels, le tableau de bord, les alertes à partir de
+  80 %, les projections et la gestion complète des catégories et objectifs
+  dans le protocole JSON/TCP.
 
 - Ajouter des versements d'épargne persistants, déduits du solde disponible et
   intégrés aux contrôles empêchant les dépenses à découvert.
@@ -26,8 +46,8 @@
 - Raccorder l'inscription, la connexion, les transactions et les budgets de
   l'interface graphique au serveur et à SQLite.
 
-- Ajouter à l'interface la création d'objectifs d'épargne et la simulation de
-  l'impact d'une dépense prévue sur le budget restant.
+- Ajouter à l'interface la création, la modification, la suppression et
+  l'alimentation réelle des objectifs d'épargne.
 
 - Ajouter les calculs de consommation, les enveloppes hebdomadaires, les
   alertes par seuil et la simulation d'une dépense prévue.
@@ -50,9 +70,8 @@
   ([#6](https://github.com/TheMuliama/plannification_budgetaire/issues/6)).
 
 - Intégrer les écrans de gestion budgétaire de la branche `feat/interface` :
-  tableau de bord, transactions, budgets, alertes, inscription et paramètres.
-  Les données restent temporaires en mémoire et la connexion est simulée ;
-  le raccordement au serveur et à SQLite reste à réaliser
+  tableau de bord, transactions, budgets, alertes, inscription et paramètres,
+  désormais raccordés au serveur et à SQLite
   ([#10](https://github.com/TheMuliama/plannification_budgetaire/pull/10)).
 
 ### Security

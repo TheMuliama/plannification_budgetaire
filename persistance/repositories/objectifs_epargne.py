@@ -138,17 +138,7 @@ class RepositoryObjectifsEpargne:
         Returns:
             Le versement enregistré.
 
-        Raises:
-            ValueError: Si l'objectif est inaccessible ou déjà atteint.
         """
-        objectif = self.obtenir_objectif(utilisateur_id, objectif_id)
-        if objectif is None:
-            raise ValueError("Objectif introuvable pour cet utilisateur.")
-        if (
-            float(objectif["montant_actuel"]) + montant
-            > float(objectif["montant_cible"]) + 1e-9
-        ):
-            raise ValueError("Le versement dépasse le montant restant de l'objectif.")
         with self._connexion:
             curseur = self._connexion.execute(
                 "INSERT INTO versements_epargne "

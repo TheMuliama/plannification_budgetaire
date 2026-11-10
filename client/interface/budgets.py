@@ -13,16 +13,44 @@ class VueBudgets(ctk.CTkFrame):
     les règles budgétaires.
     """
 
-    def __init__(self, master, on_ajouter=None, on_modifier=None, on_supprimer=None):
+    def __init__(
+        self,
+        master,
+        on_ajouter=None,
+        on_modifier=None,
+        on_supprimer=None,
+        on_modifier_categorie=None,
+        on_supprimer_categorie=None,
+        on_modifier_sous_categorie=None,
+        on_supprimer_sous_categorie=None,
+    ):
+        """Initialiser la vue et ses fonctions de rappel.
+
+        Args:
+            master: Conteneur graphique parent.
+            on_ajouter: Fonction d'ajout d'un budget.
+            on_modifier: Fonction de modification d'un budget.
+            on_supprimer: Fonction de suppression d'un budget.
+            on_modifier_categorie: Fonction de renommage d'une catégorie.
+            on_supprimer_categorie: Fonction de suppression d'une catégorie.
+            on_modifier_sous_categorie: Fonction de renommage d'une sous-catégorie.
+            on_supprimer_sous_categorie: Fonction de suppression d'une sous-catégorie.
+        """
         super().__init__(master, fg_color="#F5F3EF")
 
         # Fonctions de rappel
         self.on_ajouter = on_ajouter
         self.on_modifier = on_modifier
         self.on_supprimer = on_supprimer
+        self.on_modifier_categorie = on_modifier_categorie
+        self.on_supprimer_categorie = on_supprimer_categorie
+        self.on_modifier_sous_categorie = on_modifier_sous_categorie
+        self.on_supprimer_sous_categorie = on_supprimer_sous_categorie
 
         # Données reçues de l'extérieur
         self.budgets = []
+        self.categories = []
+        self.sous_categories = []
 
         # Couleurs
         self.vert = "#00634F"
@@ -60,6 +88,18 @@ class VueBudgets(ctk.CTkFrame):
             hover_color=self.vert_fonce,
             command=self.ouvrir_ajout,
         ).pack(side="right")
+
+        ctk.CTkButton(
+            self.entete,
+            text="Gérer les catégories",
+            width=170,
+            height=40,
+            corner_radius=8,
+            fg_color="#E8F3EF",
+            hover_color="#D3E8DF",
+            text_color=self.vert,
+            command=self.ouvrir_gestion_categories,
+        ).pack(side="right", padx=(0, 10))
 
         # Zone de résumé
         self.resume = ctk.CTkFrame(self, fg_color="transparent")
@@ -136,6 +176,125 @@ class VueBudgets(ctk.CTkFrame):
             self.carte_restant.configure(text="—")
 
         self._afficher_budgets()
+
+    def definir_categories(self, categories, sous_categories):
+        """Mémoriser les classements administrables dans cette vue.
+
+        Args:
+            categories: Catégories appartenant à l'utilisateur.
+            sous_categories: Sous-catégories de ces catégories.
+        """
+        self.categories = list(categories)
+        self.sous_categories = list(sous_categories)
+
+    def ouvrir_gestion_categories(self):
+        """Afficher les actions de renommage et suppression des classements."""
+        fenetre = ctk.CTkToplevel(self)
+        fenetre.title("Gérer les catégories")
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 560, 560)
+        fenetre.configure(fg_color=self.beige)
+        fenetre.transient(self.winfo_toplevel())
+        fenetre.grab_set()
+
+        ctk.CTkLabel(
+            fenetre,
+            text="Catégories et sous-catégories",
+            font=("Arial", 21, "bold"),
+            text_color=self.texte,
+        ).pack(anchor="w", padx=24, pady=(22, 5))
+        ctk.CTkLabel(
+            fenetre,
+            text="Supprimer une catégorie supprime aussi ses budgets et dépenses.",
+            text_color=self.rouge,
+        ).pack(anchor="w", padx=24, pady=(0, 12))
+        liste = ctk.CTkScrollableFrame(fenetre, fg_color="transparent")
+        liste.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        if not self.categories:
+            ctk.CTkLabel(
+                liste, text="Aucune catégorie.", text_color=self.gris
+            ).pack(pady=40)
+            return
+        for categorie in self.categories:
+            self._creer_ligne_classement(fenetre, liste, categorie, None)
+            for sous_categorie in self.sous_categories:
+                if sous_categorie["categorie_id"] == categorie["id"]:
+                    self._creer_ligne_classement(
+                        fenetre, liste, sous_categorie, categorie
+                    )
+
+    def _creer_ligne_classement(self, fenetre, parent, element, categorie):
+        """Créer une ligne d'administration de catégorie ou sous-catégorie."""
+        ligne = ctk.CTkFrame(parent, fg_color=self.blanc, corner_radius=8)
+        ligne.pack(fill="x", pady=4, padx=(24 if categorie else 0, 0))
+        prefixe = "↳ " if categorie else ""
+        ctk.CTkLabel(
+            ligne,
+            text=prefixe + element["nom"],
+            text_color=self.texte,
+            font=("Arial", 13, "bold" if categorie is None else "normal"),
+        ).pack(side="left", padx=12, pady=12)
+        ctk.CTkButton(
+            ligne,
+            text="Supprimer",
+            width=78,
+            fg_color="#FCE8E8",
+            hover_color="#F5D0D0",
+            text_color=self.rouge,
+            command=lambda: self._supprimer_classement(
+                fenetre, element, categorie
+            ),
+        ).pack(side="right", padx=(4, 8), pady=7)
+        ctk.CTkButton(
+            ligne,
+            text="Renommer",
+            width=78,
+            fg_color="#E8F3EF",
+            hover_color="#D3E8DF",
+            text_color=self.vert,
+            command=lambda: self._renommer_classement(
+                fenetre, element, categorie
+            ),
+        ).pack(side="right", padx=4, pady=7)
+
+    def _renommer_classement(self, fenetre, element, categorie):
+        """Demander un nouveau nom et transmettre la modification."""
+        dialogue = ctk.CTkInputDialog(
+            text=f"Nouveau nom pour « {element['nom']} » :",
+            title="Renommer",
+        )
+        nouveau_nom = dialogue.get_input()
+        if not nouveau_nom or not nouveau_nom.strip():
+            return
+        try:
+            if categorie is None:
+                self.on_modifier_categorie(element["id"], nouveau_nom.strip())
+            else:
+                self.on_modifier_sous_categorie(
+                    categorie["id"], element["id"], nouveau_nom.strip()
+                )
+        except (ConnectionError, OSError, ValueError) as erreur:
+            messagebox.showerror("Modification impossible", str(erreur), parent=fenetre)
+            return
+        fenetre.destroy()
+
+    def _supprimer_classement(self, fenetre, element, categorie):
+        """Confirmer puis transmettre la suppression d'un classement."""
+        if not messagebox.askyesno(
+            "Confirmation",
+            f"Supprimer « {element['nom']} » ?",
+            parent=fenetre,
+        ):
+            return
+        try:
+            if categorie is None:
+                self.on_supprimer_categorie(element["id"])
+            else:
+                self.on_supprimer_sous_categorie(categorie["id"], element["id"])
+        except (ConnectionError, OSError, ValueError) as erreur:
+            messagebox.showerror("Suppression impossible", str(erreur), parent=fenetre)
+            return
+        fenetre.destroy()
 
     def _formater_montant(self, montant):
         """Formater un montant pour l'affichage."""

@@ -92,11 +92,14 @@ class GestionnaireCategories:
         Raises:
             ValueError: Si la catégorie n'existe pas pour cet utilisateur.
         """
-        categorie = self._repository.modifier_categorie(
-            identifiant_utilisateur,
-            identifiant_categorie,
-            self._valider_nom(nom),
-        )
+        try:
+            categorie = self._repository.modifier_categorie(
+                identifiant_utilisateur,
+                identifiant_categorie,
+                self._valider_nom(nom),
+            )
+        except sqlite3.IntegrityError as erreur:
+            raise ValueError("Cette catégorie existe déjà.") from erreur
         if categorie is None:
             raise ValueError("Catégorie introuvable pour cet utilisateur.")
         return categorie
@@ -165,6 +168,54 @@ class GestionnaireCategories:
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
         return self._repository.recuperer_sous_categories(identifiant_categorie)
 
+    def recuperer_sous_categorie(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_categorie: int,
+        identifiant_sous_categorie: int,
+    ) -> dict[str, int | str]:
+        """Récupérer une sous-catégorie accessible à l'utilisateur.
+
+        Args:
+            identifiant_utilisateur: Identifiant du propriétaire attendu.
+            identifiant_categorie: Identifiant de la catégorie parente.
+            identifiant_sous_categorie: Identifiant de la sous-catégorie.
+
+        Returns:
+            La sous-catégorie demandée.
+
+        Raises:
+            ValueError: Si le classement n'appartient pas à l'utilisateur.
+        """
+        self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
+        resultat = self._repository.recuperer_sous_categorie(
+            identifiant_categorie, identifiant_sous_categorie
+        )
+        if resultat is None:
+            raise ValueError("Sous-catégorie incompatible avec la catégorie.")
+        return resultat
+
+    def verifier_classement(
+        self,
+        identifiant_utilisateur: int,
+        identifiant_categorie: int,
+        identifiant_sous_categorie: int | None = None,
+    ) -> None:
+        """Vérifier qu'une catégorie et sa sous-catégorie sont compatibles.
+
+        Args:
+            identifiant_utilisateur: Identifiant du propriétaire attendu.
+            identifiant_categorie: Identifiant de la catégorie.
+            identifiant_sous_categorie: Sous-catégorie facultative.
+        """
+        self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
+        if identifiant_sous_categorie is not None:
+            self.recuperer_sous_categorie(
+                identifiant_utilisateur,
+                identifiant_categorie,
+                identifiant_sous_categorie,
+            )
+
     def modifier_sous_categorie(
         self,
         identifiant_utilisateur: int,
@@ -187,11 +238,14 @@ class GestionnaireCategories:
             ValueError: Si la catégorie ou la sous-catégorie est introuvable.
         """
         self.recuperer_categorie(identifiant_utilisateur, identifiant_categorie)
-        sous_categorie = self._repository.modifier_sous_categorie(
-            identifiant_categorie,
-            identifiant_sous_categorie,
-            self._valider_nom(nom),
-        )
+        try:
+            sous_categorie = self._repository.modifier_sous_categorie(
+                identifiant_categorie,
+                identifiant_sous_categorie,
+                self._valider_nom(nom),
+            )
+        except sqlite3.IntegrityError as erreur:
+            raise ValueError("Cette sous-catégorie existe déjà.") from erreur
         if sous_categorie is None:
             raise ValueError("Sous-catégorie introuvable pour cette catégorie.")
         return sous_categorie

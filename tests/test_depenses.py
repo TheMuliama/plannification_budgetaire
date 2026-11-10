@@ -5,8 +5,16 @@ from pathlib import Path
 import pytest
 
 from persistance.database import Database
+from persistance.repositories.budgets import RepositoryBudgets
+from persistance.repositories.categories import RepositoryCategories
 from persistance.repositories.depenses import RepositoryDepenses
+from persistance.repositories.objectifs_epargne import RepositoryObjectifsEpargne
+from persistance.repositories.revenus import RepositoryRevenus
+from serveur.services.budget import GestionnaireBudget
+from serveur.services.categories import GestionnaireCategories
 from serveur.services.depenses import GestionnaireDepenses
+from serveur.services.objectifs_epargne import GestionnaireObjectifsEpargne
+from serveur.services.revenus import GestionnaireRevenus
 
 
 @pytest.fixture
@@ -25,7 +33,13 @@ def gestionnaire_depenses() -> GestionnaireDepenses:
         "INSERT INTO budgets (utilisateur_id,annee,mois,categorie_id,montant_alloue) VALUES (?,?,?,?,?)",
         ((1, 2026, 11, 1, 300), (2, 2026, 11, 2, 500)),
     )
-    yield GestionnaireDepenses(RepositoryDepenses(connexion))
+    categories = GestionnaireCategories(RepositoryCategories(connexion))
+    revenus = GestionnaireRevenus(RepositoryRevenus(connexion))
+    objectifs = GestionnaireObjectifsEpargne(RepositoryObjectifsEpargne(connexion))
+    budgets = GestionnaireBudget(
+        RepositoryBudgets(connexion), revenus, objectifs, categories
+    )
+    yield GestionnaireDepenses(RepositoryDepenses(connexion), categories, budgets)
     connexion.close()
 
 

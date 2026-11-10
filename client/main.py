@@ -13,7 +13,6 @@ from interface.inscription import VueInscription
 from interface.objectifs import VueObjectifs
 from interface.parametres import VueParametres
 from interface.transactions import VueTransactions
-from recurrence import dates_recurrentes
 
 
 class ApplicationMonBudget(ctk.CTk):
@@ -46,6 +45,7 @@ class ApplicationMonBudget(ctk.CTk):
         self.categories = []
         self.sous_categories = []
         self.solde = {"revenus": 0, "depenses": 0, "epargne": 0, "disponible": 0}
+        self.etat_budget = {"categories": [], "total_alloue": 0, "total_depense": 0}
 
         # État de l'interface
         self.page_actuelle = None
@@ -151,6 +151,7 @@ class ApplicationMonBudget(ctk.CTk):
         revenus = self.api.appeler("revenus.lister")
         depenses = self.api.appeler("depenses.lister")
         self.solde = self.api.appeler("solde.obtenir")
+        self.etat_budget = self.api.appeler("budgets.etat")
         self.transactions = [
             {
                 "id": f"revenu:{r['id']}",
@@ -339,131 +340,9 @@ class ApplicationMonBudget(ctk.CTk):
             self.afficher_parametres()
 
     def afficher_dashboard(self):
-        """Afficher le tableau de bord avec les données actuelles."""
-
-        from collections import defaultdict
-
-        aujourd_hui = datetime.now()
-        mois_actuel = aujourd_hui.strftime("%m/%Y")
-
-        # Récupérer les budgets déjà calculés
-        budgets = self.calculer_budgets_affichage()
-
-        # Total des plafonds mensuels
-        budget_total = sum((b["plafond"] for b in budgets), Decimal(0))
-
-        # Dépenses du mois en cours
-        depenses_mois = [
-            t
-            for t in self.transactions
-            if (
-                t["type"] == "Dépense"
-                and t.get("statut") == "realisee"
-                and str(t["date"])[3:] == mois_actuel
-            )
-        ]
-
-        total_depenses = sum(
-            (Decimal(str(t["montant"])) for t in depenses_mois), Decimal(0)
-        )
-
-        # Solde réellement disponible après dépenses et versements d'épargne
-        restant = Decimal(str(self.solde.get("disponible", 0)))
-
-        # Répartition par catégorie
-        repartition_categories = defaultdict(lambda: Decimal(0))
-
-        for transaction in depenses_mois:
-            categorie = transaction.get("categorie", "Sans catégorie")
-
-            repartition_categories[categorie] += Decimal(str(transaction["montant"]))
-
-        repartition = [
-            {"categorie": categorie, "montant": float(montant)}
-            for categorie, montant in repartition_categories.items()
-        ]
-
-        # Budgets par catégorie
-        budgets_dashboard = []
-
-        for budget in budgets:
-            budgets_dashboard.append(
-                {
-                    "categorie": budget["libelle"],
-                    "categorie_parent": budget["categorie"],
-                    "plafond": float(budget["plafond"]),
-                    "depense": float(budget["depense"]),
-                    "pourcentage": budget["progression"] * 100,
-                }
-            )
-
-        # Évolution des dépenses sur 6 mois
-        evolution = []
-
-        for decalage in range(5, -1, -1):
-            indice_mois = aujourd_hui.year * 12 + aujourd_hui.month - 1 - decalage
-
-            annee = indice_mois // 12
-            mois = indice_mois % 12 + 1
-
-            total = Decimal(0)
-
-            for transaction in self.transactions:
-                if (
-                    transaction["type"] != "Dépense"
-                    or transaction.get("statut") != "realisee"
-                ):
-                    continue
-
-                try:
-                    date_transaction = datetime.strptime(
-                        transaction["date"], "%d/%m/%Y"
-                    )
-                except ValueError:
-                    continue
-
-                if date_transaction.year == annee and date_transaction.month == mois:
-                    total += Decimal(str(transaction["montant"]))
-
-            evolution.append({"mois": f"{mois:02d}/{annee}", "montant": float(total)})
-
-        # Dernières dépenses
-        dernieres_depenses = sorted(
-            [
-                t
-                for t in self.transactions
-                if t["type"] == "Dépense" and t.get("statut") == "realisee"
-            ],
-            key=lambda t: datetime.strptime(t["date"], "%d/%m/%Y"),
-            reverse=True,
-        )[:5]
-
-        # Alertes
-        alertes = self.obtenir_alertes()
-
-        # Garder uniquement les alertes urgentes
-        alertes_urgentes = [
-            alerte
-            for alerte in alertes
-            if alerte.get("type") in ("attention", "risque")
-        ]
-
-        # Préparer toutes les données
-        donnees = {
-            "prenom": self.profil.get("prenom", ""),
-            "mois": aujourd_hui.strftime("Résumé du mois %m/%Y"),
-            "budget_mois": float(budget_total),
-            "depense": float(total_depenses),
-            "restant": float(restant),
-            "alertes_actives": len(alertes_urgentes),
-            "repartition": repartition,
-            "budgets": budgets_dashboard,
-            "evolution": evolution,
-            "dernieres_depenses": dernieres_depenses,
-            "alertes": alertes_urgentes,
-        }
-
-        # Créer le tableau de bord
+        """Afficher les indicateurs déjà calculés par le serveur."""
+        donnees = self.api.appeler("dashboard.obtenir")
+        donnees["prenom"] = self.profil.get("prenom", "")
         self.vue = TableauDeBord(
             self.contenu,
             ajouter_depense=lambda: self.afficher_page("transactions"),
@@ -473,7 +352,6 @@ class ApplicationMonBudget(ctk.CTk):
 
         self.vue.pack(fill="both", expand=True)
 
-        # Actualiser l'affichage
         self.vue.actualiser(donnees)
 
     def afficher_transactions(self):
@@ -497,15 +375,24 @@ class ApplicationMonBudget(ctk.CTk):
             on_ajouter=self.ajouter_budget,
             on_modifier=self.modifier_budget,
             on_supprimer=self.supprimer_budget,
+            on_modifier_categorie=self.modifier_categorie,
+            on_supprimer_categorie=self.supprimer_categorie,
+            on_modifier_sous_categorie=self.modifier_sous_categorie,
+            on_supprimer_sous_categorie=self.supprimer_sous_categorie,
         )
 
         self.vue.pack(fill="both", expand=True)
+        self.vue.definir_categories(self.categories, self.sous_categories)
         self.actualiser_budgets()
 
     def afficher_objectifs(self):
         """Afficher les objectifs et leurs versements d'épargne."""
         self.vue = VueObjectifs(
-            self.contenu, self.ajouter_objectif, self.alimenter_objectif
+            self.contenu,
+            self.ajouter_objectif,
+            self.alimenter_objectif,
+            self.modifier_objectif,
+            self.supprimer_objectif,
         )
         self.vue.pack(fill="both", expand=True)
         self.vue.actualiser(self.api.appeler("objectifs.analyser"))
@@ -538,6 +425,25 @@ class ApplicationMonBudget(ctk.CTk):
         if self.page_actuelle == "objectifs":
             self.vue.actualiser(self.api.appeler("objectifs.analyser"))
 
+    def modifier_objectif(self, objectif_id, donnees):
+        """Modifier un objectif puis rafraîchir son analyse.
+
+        Args:
+            objectif_id: Identifiant de l'objectif à modifier.
+            donnees: Nouvelles informations saisies dans l'interface.
+        """
+        self.api.appeler("objectifs.modifier", id=objectif_id, **donnees)
+        self.charger_donnees()
+        if self.page_actuelle == "objectifs":
+            self.vue.actualiser(self.api.appeler("objectifs.analyser"))
+
+    def supprimer_objectif(self, objectif_id):
+        """Supprimer un objectif et rafraîchir la page d'épargne."""
+        self.api.appeler("objectifs.supprimer", id=objectif_id)
+        self.charger_donnees()
+        if self.page_actuelle == "objectifs":
+            self.vue.actualiser(self.api.appeler("objectifs.analyser"))
+
     def afficher_parametres(self):
         """Afficher les paramètres."""
 
@@ -554,7 +460,7 @@ class ApplicationMonBudget(ctk.CTk):
         self.vue.actualiser(self.profil)
 
     # ---------------------------------------
-    # TRANSACTIONS TEMPORAIRES
+    # TRANSACTIONS
     # ---------------------------------------
 
     def ajouter_transaction(self, donnees):
@@ -564,22 +470,24 @@ class ApplicationMonBudget(ctk.CTk):
             donnees: Informations et récurrence choisies dans le formulaire.
         """
         date_transaction = datetime.strptime(donnees["date"], "%d/%m/%Y")
-        date_fin = None
-        if donnees.get("date_fin"):
-            date_fin = datetime.strptime(donnees["date_fin"], "%d/%m/%Y").date()
-        occurrences = dates_recurrentes(
-            date_transaction.date(), donnees.get("frequence", "Aucune"), date_fin
+        date_fin = (
+            datetime.strptime(donnees["date_fin"], "%d/%m/%Y").date().isoformat()
+            if donnees.get("date_fin")
+            else None
         )
+        recurrence = {
+            "date": date_transaction.date().isoformat(),
+            "date_fin": date_fin,
+            "frequence": donnees.get("frequence", "Aucune"),
+            "montant": float(donnees["montant"]),
+            "description": donnees["libelle"],
+        }
         if donnees["type"] == "Revenu":
-            for occurrence in occurrences:
-                self.api.appeler(
-                    "revenus.creer",
-                    montant=float(donnees["montant"]),
-                    date=occurrence.isoformat(),
-                    description=donnees["libelle"],
-                    statut="recu" if occurrence <= datetime.now().date() else "prevu",
-                    categorie=donnees["categorie"],
-                )
+            self.api.appeler(
+                "revenus.creer_recurrents",
+                **recurrence,
+                categorie=donnees["categorie"],
+            )
         else:
             budget = next(
                 (
@@ -595,26 +503,12 @@ class ApplicationMonBudget(ctk.CTk):
                 raise ValueError(
                     "Aucun budget pour cette catégorie au mois de la transaction."
                 )
-            occurrences_realisees = sum(
-                1 for occurrence in occurrences if occurrence <= datetime.now().date()
+            self.api.appeler(
+                "depenses.creer_recurrentes",
+                **recurrence,
+                categorie_id=budget["categorie_id"],
+                sous_categorie_id=budget["sous_categorie_id"],
             )
-            solde = Decimal(str(self.solde["disponible"]))
-            total_immediat = donnees["montant"] * occurrences_realisees
-            if total_immediat > solde:
-                raise ValueError(f"Solde insuffisant : {solde:.2f} € disponible(s).")
-            for occurrence in occurrences:
-                self.api.appeler(
-                    "depenses.creer",
-                    budget_id=budget["id"],
-                    categorie_id=budget["categorie_id"],
-                    sous_categorie_id=budget["sous_categorie_id"],
-                    montant=float(donnees["montant"]),
-                    date=occurrence.isoformat(),
-                    description=donnees["libelle"],
-                    statut="realisee"
-                    if occurrence <= datetime.now().date()
-                    else "prevue",
-                )
         self.charger_donnees()
         self.actualiser_transactions()
 
@@ -636,9 +530,6 @@ class ApplicationMonBudget(ctk.CTk):
                 montant=float(donnees["montant"]),
                 date=date_iso,
                 description=donnees["libelle"],
-                statut="recu"
-                if date_transaction.date() <= datetime.now().date()
-                else "prevu",
                 categorie=donnees["categorie"],
             )
         else:
@@ -677,9 +568,6 @@ class ApplicationMonBudget(ctk.CTk):
                 montant=float(donnees["montant"]),
                 date=date_iso,
                 description=donnees["libelle"],
-                statut="realisee"
-                if date_transaction.date() <= datetime.now().date()
-                else "prevue",
             )
         self.charger_donnees()
         self.actualiser_transactions()
@@ -729,64 +617,8 @@ class ApplicationMonBudget(ctk.CTk):
     # ---------------------------------------
 
     def obtenir_alertes(self):
-        """Préparer les états des budgets du mois."""
-
-        alertes = []
-
-        for budget in self.calculer_budgets_affichage():
-            categorie = budget["categorie"]
-
-            pourcentage = max(0, float(budget["progression"]) * 100)
-
-            if pourcentage < 80:
-                continue
-
-            # ROUGE : risques et dépassements
-            if pourcentage >= 90:
-                niveau = "risque"
-
-                if pourcentage > 100:
-                    message = (
-                        f"Le budget {categorie} est dépassé ! "
-                        f"Vous avez utilisé {pourcentage:.1f} % "
-                        "de votre budget mensuel."
-                    )
-
-                elif pourcentage >= 100:
-                    message = (
-                        f"Le budget {categorie} a atteint 100 % de sa limite mensuelle."
-                    )
-
-                else:
-                    message = (
-                        f"Le budget {categorie} est utilisé à "
-                        f"{pourcentage:.1f} %. "
-                        "Il reste peu de marge avant le dépassement."
-                    )
-
-            # ORANGE : attention
-            elif pourcentage >= 80:
-                niveau = "attention"
-
-                message = (
-                    f"Le budget {categorie} est utilisé à "
-                    f"{pourcentage:.1f} %. "
-                    "Il approche de sa limite mensuelle."
-                )
-
-            alertes.append(
-                {
-                    "id": budget["id"],
-                    "titre": f"Budget {categorie}",
-                    "categorie": categorie,
-                    "type": niveau,
-                    "message": message,
-                    "pourcentage": pourcentage,
-                    "statut": "active",
-                }
-            )
-
-        return alertes
+        """Demander au gestionnaire serveur les alertes actives."""
+        return self.api.appeler("alertes.lister")
 
     def afficher_alertes(self):
         """Afficher la page des alertes."""
@@ -798,7 +630,7 @@ class ApplicationMonBudget(ctk.CTk):
         self.vue.actualiser(self.obtenir_alertes())
 
     # ---------------------------------------
-    # BUDGETS TEMPORAIRES
+    # BUDGETS
     # ---------------------------------------
 
     def ajouter_budget(self, categorie, sous_categorie, plafond):
@@ -861,63 +693,47 @@ class ApplicationMonBudget(ctk.CTk):
         self.charger_donnees()
         self.actualiser_budgets()
 
-    def calculer_budgets_affichage(self):
-        """Préparer les données de présentation des budgets."""
+    def modifier_categorie(self, identifiant, nom):
+        """Renommer une catégorie depuis l'écran des budgets.
 
-        resultat = []
+        Args:
+            identifiant: Identifiant de la catégorie.
+            nom: Nouveau nom validé par l'interface.
+        """
+        self.api.appeler("categories.modifier", id=int(identifiant), nom=nom)
+        self.charger_donnees()
+        self.actualiser_budgets()
 
-        mois_actuel = datetime.now().strftime("%m/%Y")
-        maintenant = datetime.now()
+    def supprimer_categorie(self, identifiant):
+        """Supprimer une catégorie après confirmation dans l'interface."""
+        self.api.appeler("categories.supprimer", id=int(identifiant))
+        self.charger_donnees()
+        self.actualiser_budgets()
 
-        for budget in self.budgets:
-            if budget["annee"] != maintenant.year or budget["mois"] != maintenant.month:
-                continue
-            plafond = budget["plafond"]
+    def modifier_sous_categorie(self, categorie_id, identifiant, nom):
+        """Renommer une sous-catégorie depuis l'écran des budgets."""
+        self.api.appeler(
+            "sous_categories.modifier",
+            categorie_id=int(categorie_id),
+            id=int(identifiant),
+            nom=nom,
+        )
+        self.charger_donnees()
+        self.actualiser_budgets()
 
-            depense = sum(
-                (
-                    Decimal(str(t["montant"]))
-                    for t in self.transactions
-                    if (
-                        t["type"] == "Dépense"
-                        and t.get("statut") == "realisee"
-                        and t.get("budget_id") == budget["id"]
-                        and str(t["date"])[3:] == mois_actuel
-                    )
-                ),
-                Decimal(0),
-            )
+    def supprimer_sous_categorie(self, categorie_id, identifiant):
+        """Supprimer une sous-catégorie après confirmation."""
+        self.api.appeler(
+            "sous_categories.supprimer",
+            categorie_id=int(categorie_id),
+            id=int(identifiant),
+        )
+        self.charger_donnees()
+        self.actualiser_budgets()
 
-            restant = plafond - depense
-
-            progression = float(depense / plafond) if plafond > 0 else 0
-
-            alerte = None
-
-            if progression >= 0.90:
-                alerte = "risque"
-            elif progression >= 0.80:
-                alerte = "attention"
-            elif progression >= 0.50:
-                alerte = "information"
-            else:
-                alerte = "normal"
-
-            resultat.append(
-                {
-                    "id": budget["id"],
-                    "categorie": budget["categorie"],
-                    "libelle": budget["libelle"],
-                    "sous_categorie": budget["sous_categorie"],
-                    "plafond": plafond,
-                    "depense": depense,
-                    "restant": restant,
-                    "progression": progression,
-                    "alerte": alerte,
-                }
-            )
-
-        return resultat
+    def obtenir_budgets_affichage(self):
+        """Retourner les états déjà calculés par le serveur."""
+        return self.etat_budget.get("categories", [])
 
     def actualiser_budgets(self):
         """Transmettre les données à VueBudgets."""
@@ -925,13 +741,14 @@ class ApplicationMonBudget(ctk.CTk):
         if self.page_actuelle != "budgets":
             return
 
-        budgets = self.calculer_budgets_affichage()
+        budgets = self.obtenir_budgets_affichage()
+        self.vue.definir_categories(self.categories, self.sous_categories)
 
-        total = sum((b["plafond"] for b in budgets), Decimal(0))
-
-        depense = sum((b["depense"] for b in budgets), Decimal(0))
-
-        resume = {"total": total, "depense": depense, "restant": total - depense}
+        resume = {
+            "total": self.etat_budget.get("total_alloue", 0),
+            "depense": self.etat_budget.get("total_depense", 0),
+            "restant": self.etat_budget.get("total_restant", 0),
+        }
 
         self.vue.actualiser(budgets, resume)
 

@@ -19,7 +19,6 @@ class RepositoryDepenses:
         Returns:
             La dépense enregistrée.
         """
-        self._verifier_liens(donnees)
         with self._connexion:
             curseur = self._connexion.execute(
                 "INSERT INTO depenses (utilisateur_id,budget_id,categorie_id,sous_categorie_id,"
@@ -97,8 +96,6 @@ class RepositoryDepenses:
         Returns:
             La dépense modifiée, ou ``None`` si elle est inaccessible.
         """
-        donnees["utilisateur_id"] = utilisateur_id
-        self._verifier_liens(donnees)
         with self._connexion:
             curseur = self._connexion.execute(
                 "UPDATE depenses SET budget_id=?,categorie_id=?,sous_categorie_id=?,montant=?,"
@@ -137,22 +134,3 @@ class RepositoryDepenses:
                 (utilisateur_id, depense_id),
             )
         return curseur.rowcount > 0
-
-    def _verifier_liens(self, donnees: dict[str, Any]) -> None:
-        budget = self._connexion.execute(
-            "SELECT categorie_id,sous_categorie_id FROM budgets WHERE id=? AND utilisateur_id=?",
-            (donnees["budget_id"], donnees["utilisateur_id"]),
-        ).fetchone()
-        if budget is None:
-            raise ValueError("Budget introuvable pour cet utilisateur.")
-        if budget["categorie_id"] != donnees["categorie_id"]:
-            raise ValueError("La catégorie ne correspond pas au budget.")
-        if (
-            donnees["sous_categorie_id"] is not None
-            and self._connexion.execute(
-                "SELECT 1 FROM sous_categories WHERE id=? AND categorie_id=?",
-                (donnees["sous_categorie_id"], donnees["categorie_id"]),
-            ).fetchone()
-            is None
-        ):
-            raise ValueError("Sous-catégorie incompatible avec la catégorie.")

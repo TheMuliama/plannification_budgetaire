@@ -2,6 +2,7 @@
 
 import sqlite3
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 from persistance.repositories.budgets import RepositoryBudgets
@@ -12,13 +13,14 @@ from persistance.repositories.revenus import RepositoryRevenus
 from persistance.repositories.utilisateurs import RepositoryUtilisateurs
 from serveur.communication.serveur_socket import ServeurSocket
 from serveur.securite.sessions import GestionnaireSessions
-from serveur.services.analyse_epargne import AnalyseurEpargne
+from serveur.services.alertes import GestionnaireAlertes
 from serveur.services.budget import GestionnaireBudget
+from serveur.services.calcul_budget import CalculateurBudget
 from serveur.services.categories import GestionnaireCategories
 from serveur.services.depenses import GestionnaireDepenses
 from serveur.services.objectifs_epargne import GestionnaireObjectifsEpargne
+from serveur.services.projection import MoteurProjection
 from serveur.services.revenus import GestionnaireRevenus
-from serveur.services.solde import GestionnaireSolde
 from serveur.services.utilisateurs import GestionnaireUtilisateurs
 
 DonneesRequete = dict[str, Any]
@@ -36,23 +38,27 @@ class ApplicationServeur:
         self.utilisateurs = GestionnaireUtilisateurs(RepositoryUtilisateurs(connexion))
         self.categories = GestionnaireCategories(RepositoryCategories(connexion))
         self.revenus = GestionnaireRevenus(RepositoryRevenus(connexion))
-        self.budgets = GestionnaireBudget(RepositoryBudgets(connexion))
-        self.depenses = GestionnaireDepenses(RepositoryDepenses(connexion))
         self.objectifs = GestionnaireObjectifsEpargne(
             RepositoryObjectifsEpargne(connexion)
         )
+        self.budgets = GestionnaireBudget(
+            RepositoryBudgets(connexion),
+            self.revenus,
+            self.objectifs,
+            self.categories,
+        )
+        self.depenses = GestionnaireDepenses(
+            RepositoryDepenses(connexion), self.categories, self.budgets
+        )
 
         self.sessions = GestionnaireSessions()
-        self.solde = GestionnaireSolde(
-            self.revenus,
-            self.depenses,
-            self.objectifs,
+        self.calculateur = CalculateurBudget(
+            self.budgets, self.revenus, self.depenses, self.objectifs
         )
-        self.analyseur_epargne = AnalyseurEpargne(
-            self.revenus,
-            self.depenses,
-            self.objectifs,
+        self.projection = MoteurProjection(
+            self.calculateur, self.depenses, self.objectifs
         )
+        self.alertes = GestionnaireAlertes(self.calculateur, self.projection)
 
     def traitements(self) -> dict[str, Traitement]:
         """Associer chaque action du protocole à son traitement.
@@ -67,10 +73,15 @@ class ApplicationServeur:
             "utilisateurs.changer_mot_de_passe": self.changer_mot_de_passe,
             "utilisateurs.supprimer": self.supprimer_compte,
             "categories.creer": self.creer_categorie,
+            "categories.modifier": self.modifier_categorie,
+            "categories.supprimer": self.supprimer_categorie,
             "categories.lister": self.lister_categories,
             "sous_categories.creer": self.creer_sous_categorie,
+            "sous_categories.modifier": self.modifier_sous_categorie,
+            "sous_categories.supprimer": self.supprimer_sous_categorie,
             "sous_categories.lister": self.lister_sous_categories,
             "revenus.creer": self.creer_revenu,
+            "revenus.creer_recurrents": self.creer_revenus_recurrents,
             "revenus.modifier": self.modifier_revenu,
             "revenus.supprimer": self.supprimer_revenu,
             "revenus.lister": self.lister_revenus,
@@ -78,16 +89,23 @@ class ApplicationServeur:
             "budgets.modifier": self.modifier_budget,
             "budgets.supprimer": self.supprimer_budget,
             "budgets.lister": self.lister_budgets,
+            "budgets.etat": self.obtenir_etat_budget,
             "depenses.creer": self.creer_depense,
+            "depenses.creer_recurrentes": self.creer_depenses_recurrentes,
             "depenses.modifier": self.modifier_depense,
             "depenses.supprimer": self.supprimer_depense,
             "depenses.lister": self.lister_depenses,
             "objectifs.creer": self.creer_objectif,
+            "objectifs.modifier": self.modifier_objectif,
+            "objectifs.supprimer": self.supprimer_objectif,
             "objectifs.lister": self.lister_objectifs,
             "objectifs.analyser": self.analyser_objectifs,
             "objectifs.alimenter": self.alimenter_objectif,
             "objectifs.versements": self.lister_versements,
             "solde.obtenir": self.obtenir_solde,
+            "projection.simuler": self.simuler_projection,
+            "alertes.lister": self.lister_alertes,
+            "dashboard.obtenir": self.obtenir_tableau_de_bord,
         }
 
     def creer_compte(self, donnees: DonneesRequete) -> dict[str, Any]:
@@ -195,6 +213,29 @@ class ApplicationServeur:
             self._identifiant_utilisateur(donnees)
         )
 
+    def modifier_categorie(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Modifier une catégorie de l'utilisateur authentifié.
+
+        Args:
+            donnees: Session, identifiant et nouveau nom de la catégorie.
+
+        Returns:
+            La catégorie modifiée.
+        """
+        return self.categories.modifier_categorie(
+            self._identifiant_utilisateur(donnees), donnees["id"], donnees["nom"]
+        )
+
+    def supprimer_categorie(self, donnees: DonneesRequete) -> None:
+        """Supprimer une catégorie de l'utilisateur authentifié.
+
+        Args:
+            donnees: Session et identifiant de la catégorie.
+        """
+        self.categories.supprimer_categorie(
+            self._identifiant_utilisateur(donnees), donnees["id"]
+        )
+
     def creer_sous_categorie(self, donnees: DonneesRequete) -> dict[str, Any]:
         """Créer une sous-catégorie dans une catégorie accessible.
 
@@ -227,6 +268,34 @@ class ApplicationServeur:
             donnees["categorie_id"],
         )
 
+    def modifier_sous_categorie(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Modifier une sous-catégorie accessible à l'utilisateur.
+
+        Args:
+            donnees: Session, catégorie parente, identifiant et nouveau nom.
+
+        Returns:
+            La sous-catégorie modifiée.
+        """
+        return self.categories.modifier_sous_categorie(
+            self._identifiant_utilisateur(donnees),
+            donnees["categorie_id"],
+            donnees["id"],
+            donnees["nom"],
+        )
+
+    def supprimer_sous_categorie(self, donnees: DonneesRequete) -> None:
+        """Supprimer une sous-catégorie accessible à l'utilisateur.
+
+        Args:
+            donnees: Session, catégorie parente et identifiant à supprimer.
+        """
+        self.categories.supprimer_sous_categorie(
+            self._identifiant_utilisateur(donnees),
+            donnees["categorie_id"],
+            donnees["id"],
+        )
+
     def creer_revenu(self, donnees: DonneesRequete) -> dict[str, Any]:
         """Créer un revenu pour l'utilisateur authentifié.
 
@@ -241,6 +310,22 @@ class ApplicationServeur:
                 **donnees,
                 "utilisateur_id": self._identifiant_utilisateur(donnees),
             }
+        )
+
+    def creer_revenus_recurrents(
+        self, donnees: DonneesRequete
+    ) -> list[dict[str, Any]]:
+        """Créer côté serveur toutes les occurrences d'un revenu récurrent.
+
+        Args:
+            donnees: Session, revenu commun, fréquence et date de fin.
+
+        Returns:
+            Les revenus créés dans l'ordre chronologique.
+        """
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        return self.revenus.ajouter_revenus_recurrents(
+            identifiant_utilisateur, donnees
         )
 
     def modifier_revenu(self, donnees: DonneesRequete) -> dict[str, Any]:
@@ -342,6 +427,22 @@ class ApplicationServeur:
             donnees.get("mois"),
         )
 
+    def obtenir_etat_budget(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Calculer l'état mensuel des allocations de l'utilisateur.
+
+        Args:
+            donnees: Session et période mensuelle facultative.
+
+        Returns:
+            L'état budgétaire mensuel complet.
+        """
+        aujourd_hui = date.today()
+        return self.calculateur.calculer_etat_mensuel(
+            self._identifiant_utilisateur(donnees),
+            int(donnees.get("annee", aujourd_hui.year)),
+            int(donnees.get("mois", aujourd_hui.month)),
+        )
+
     def creer_depense(self, donnees: DonneesRequete) -> dict[str, Any]:
         """Valider le solde puis créer une dépense.
 
@@ -355,10 +456,27 @@ class ApplicationServeur:
             ValueError: Si la dépense dépasse le solde disponible.
         """
         identifiant_utilisateur = self._identifiant_utilisateur(donnees)
-        self.solde.verifier_depense(identifiant_utilisateur, donnees)
         return self.depenses.ajouter_depense(
-            {**donnees, "utilisateur_id": identifiant_utilisateur}
+            {**donnees, "utilisateur_id": identifiant_utilisateur},
+            self.calculateur.verifier_depense,
         )
+
+    def creer_depenses_recurrentes(
+        self, donnees: DonneesRequete
+    ) -> list[dict[str, Any]]:
+        """Créer une série de dépenses avec les budgets de chaque mois.
+
+        La série entière est validée avant la première écriture afin d'éviter
+        une création partielle lorsqu'un budget mensuel manque.
+        """
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        depenses = self.depenses.preparer_depenses_recurrentes(
+            identifiant_utilisateur, donnees
+        )
+        self.calculateur.verifier_depenses_recurrentes(
+            identifiant_utilisateur, depenses
+        )
+        return self.depenses.enregistrer_depenses_preparees(depenses)
 
     def modifier_depense(self, donnees: DonneesRequete) -> dict[str, Any]:
         """Valider le solde puis modifier une dépense accessible.
@@ -374,19 +492,11 @@ class ApplicationServeur:
         """
         identifiant_utilisateur = self._identifiant_utilisateur(donnees)
         identifiant_depense = donnees["id"]
-        depenses = self.depenses.consulter_depenses(identifiant_utilisateur)
-        if not any(depense["id"] == identifiant_depense for depense in depenses):
-            raise ValueError("Dépense introuvable pour cet utilisateur.")
-
-        self.solde.verifier_depense(
-            identifiant_utilisateur,
-            donnees,
-            identifiant_depense,
-        )
         return self.depenses.modifier_depense(
             identifiant_utilisateur,
             identifiant_depense,
             donnees,
+            self.calculateur.verifier_depense,
         )
 
     def supprimer_depense(self, donnees: DonneesRequete) -> None:
@@ -430,6 +540,29 @@ class ApplicationServeur:
             }
         )
 
+    def modifier_objectif(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Modifier un objectif d'épargne accessible.
+
+        Args:
+            donnees: Session, identifiant et nouvelles valeurs de l'objectif.
+
+        Returns:
+            L'objectif modifié.
+        """
+        return self.objectifs.modifier_objectif(
+            self._identifiant_utilisateur(donnees), donnees["id"], donnees
+        )
+
+    def supprimer_objectif(self, donnees: DonneesRequete) -> None:
+        """Supprimer un objectif d'épargne accessible.
+
+        Args:
+            donnees: Session et identifiant de l'objectif.
+        """
+        self.objectifs.supprimer_objectif(
+            self._identifiant_utilisateur(donnees), donnees["id"]
+        )
+
     def lister_objectifs(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
         """Lister les objectifs d'épargne accessibles.
 
@@ -466,7 +599,9 @@ class ApplicationServeur:
         Returns:
             Les totaux des revenus, dépenses, épargne et solde disponible.
         """
-        return self.solde.obtenir(self._identifiant_utilisateur(donnees))
+        return self.calculateur.obtenir_solde(
+            self._identifiant_utilisateur(donnees)
+        )
 
     def alimenter_objectif(self, donnees: DonneesRequete) -> dict[str, Any]:
         """Valider le solde puis enregistrer un versement d'épargne.
@@ -482,7 +617,7 @@ class ApplicationServeur:
         """
         identifiant_utilisateur = self._identifiant_utilisateur(donnees)
         montant = float(donnees["montant"])
-        self.solde.verifier_versement(identifiant_utilisateur, montant)
+        self.calculateur.verifier_versement(identifiant_utilisateur, montant)
         return self.objectifs.alimenter_objectif(
             identifiant_utilisateur,
             donnees["objectif_id"],
@@ -499,7 +634,70 @@ class ApplicationServeur:
         Returns:
             Les objectifs enrichis de leurs indicateurs mensuels.
         """
-        return self.analyseur_epargne.analyser(self._identifiant_utilisateur(donnees))
+        return self.calculateur.analyser_objectifs(
+            self._identifiant_utilisateur(donnees)
+        )
+
+    def simuler_projection(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Projeter le budget mensuel sans modifier les données persistantes.
+
+        Args:
+            donnees: Session, période et dépense hypothétique facultatives.
+
+        Returns:
+            La situation projetée et ses conséquences.
+        """
+        aujourd_hui = date.today()
+        return self.projection.projeter_mois(
+            self._identifiant_utilisateur(donnees),
+            int(donnees.get("annee", aujourd_hui.year)),
+            int(donnees.get("mois", aujourd_hui.month)),
+            float(donnees.get("montant", 0)),
+            donnees.get("objectif_id"),
+            donnees.get("budget_id"),
+        )
+
+    def lister_alertes(self, donnees: DonneesRequete) -> list[dict[str, Any]]:
+        """Lister les alertes actives à partir du seuil de 80 %.
+
+        Args:
+            donnees: Session, période et seuil facultatifs.
+
+        Returns:
+            Les alertes actives prêtes à présenter.
+        """
+        aujourd_hui = date.today()
+        return self.alertes.lister_alertes(
+            self._identifiant_utilisateur(donnees),
+            int(donnees.get("annee", aujourd_hui.year)),
+            int(donnees.get("mois", aujourd_hui.month)),
+            float(donnees.get("seuil", 80)),
+        )
+
+    def obtenir_tableau_de_bord(self, donnees: DonneesRequete) -> dict[str, Any]:
+        """Fournir au client un tableau de bord déjà calculé.
+
+        Args:
+            donnees: Session et période mensuelle facultative.
+
+        Returns:
+            Les indicateurs, graphiques et alertes du tableau de bord.
+        """
+        aujourd_hui = date.today()
+        annee = int(donnees.get("annee", aujourd_hui.year))
+        mois = int(donnees.get("mois", aujourd_hui.month))
+        identifiant_utilisateur = self._identifiant_utilisateur(donnees)
+        tableau = self.calculateur.construire_tableau_de_bord(
+            identifiant_utilisateur, annee, mois
+        )
+        alertes = self.alertes.lister_alertes(
+            identifiant_utilisateur, annee, mois
+        )
+        return {
+            **tableau,
+            "alertes": alertes,
+            "alertes_actives": len(alertes),
+        }
 
     def _identifiant_utilisateur(self, donnees: DonneesRequete) -> int:
         """Résoudre le propriétaire à partir du jeton de session."""

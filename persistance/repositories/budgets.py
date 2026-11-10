@@ -34,7 +34,6 @@ class RepositoryBudgets:
         Returns:
             Le budget enregistré.
         """
-        self._verifier_classement(utilisateur_id, categorie_id, sous_categorie_id)
         with self._connexion:
             curseur = self._connexion.execute(
                 "INSERT INTO budgets (utilisateur_id, annee, mois, categorie_id, "
@@ -114,9 +113,6 @@ class RepositoryBudgets:
         Returns:
             Le budget modifié, ou ``None`` s'il est inaccessible.
         """
-        self._verifier_classement(
-            utilisateur_id, donnees["categorie_id"], donnees["sous_categorie_id"]
-        )
         with self._connexion:
             curseur = self._connexion.execute(
                 "UPDATE budgets SET annee=?, mois=?, categorie_id=?, sous_categorie_id=?, "
@@ -152,22 +148,3 @@ class RepositoryBudgets:
                 (utilisateur_id, budget_id),
             )
         return curseur.rowcount > 0
-
-    def _verifier_classement(
-        self, utilisateur_id: int, categorie_id: int, sous_categorie_id: int | None
-    ) -> None:
-        categorie = self._connexion.execute(
-            "SELECT 1 FROM categories WHERE id=? AND utilisateur_id=?",
-            (categorie_id, utilisateur_id),
-        ).fetchone()
-        if categorie is None:
-            raise ValueError("Catégorie introuvable pour cet utilisateur.")
-        if (
-            sous_categorie_id is not None
-            and self._connexion.execute(
-                "SELECT 1 FROM sous_categories WHERE id=? AND categorie_id=?",
-                (sous_categorie_id, categorie_id),
-            ).fetchone()
-            is None
-        ):
-            raise ValueError("Sous-catégorie incompatible avec la catégorie.")

@@ -128,6 +128,14 @@ class GestionnaireObjectifsEpargne:
             raise ValueError("Le versement doit être strictement positif.")
         if jour > date.today():
             raise ValueError("Un versement ne peut pas être daté dans le futur.")
+        objectif = self.consulter_objectif(
+            identifiant_utilisateur, identifiant_objectif
+        )
+        if (
+            float(objectif["montant_actuel"]) + valeur
+            > float(objectif["montant_cible"]) + 1e-9
+        ):
+            raise ValueError("Le versement dépasse le montant restant de l'objectif.")
         return self._repository.ajouter_versement(
             identifiant_utilisateur, identifiant_objectif, valeur, date_versement
         )
@@ -200,9 +208,8 @@ class GestionnaireObjectifsEpargne:
             Les informations relatives à l'écart constaté.
         """
         attendu = float(
-            plan.get(
-                "montant_periodique_prevu", plan.get("montant_periodique_recommande", 0)
-            )
+            plan.get("montant_periodique_prevu")
+            or plan.get("montant_periodique_recommande", 0)
         )
         ecart = round(float(epargne_realisee) - attendu, 2)
         return {

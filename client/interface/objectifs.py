@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from tkinter import messagebox
 
 import customtkinter as ctk
 from interface.outils import centrer_fenetre
@@ -20,10 +21,28 @@ class VueObjectifs(ctk.CTkFrame):
     BORDURE = "#E5E5E5"
     ROUGE = "#C94C4C"
 
-    def __init__(self, master, on_ajouter, on_alimenter):
+    def __init__(
+        self,
+        master,
+        on_ajouter,
+        on_alimenter,
+        on_modifier=None,
+        on_supprimer=None,
+    ):
+        """Initialiser la vue et ses fonctions de rappel.
+
+        Args:
+            master: Conteneur graphique parent.
+            on_ajouter: Fonction de création d'un objectif.
+            on_alimenter: Fonction d'ajout d'un versement.
+            on_modifier: Fonction de modification d'un objectif.
+            on_supprimer: Fonction de suppression d'un objectif.
+        """
         super().__init__(master, fg_color=self.FOND)
         self.on_ajouter = on_ajouter
         self.on_alimenter = on_alimenter
+        self.on_modifier = on_modifier
+        self.on_supprimer = on_supprimer
         self.champs = {}
         self._construire_interface()
 
@@ -274,6 +293,110 @@ class VueObjectifs(ctk.CTkFrame):
             command=valider,
         ).pack(pady=8)
 
+    def _ouvrir_modification(self, objectif):
+        """Afficher un formulaire prérempli pour modifier un objectif."""
+        fenetre = ctk.CTkToplevel(self)
+        fenetre.title("Modifier l'objectif")
+        fenetre.resizable(False, False)
+        fenetre.transient(self.winfo_toplevel())
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 440, 470)
+        fenetre.grab_set()
+        ctk.CTkLabel(
+            fenetre,
+            text="Modifier l'objectif",
+            font=("Arial", 20, "bold"),
+            text_color=self.TEXTE,
+        ).pack(pady=(24, 15))
+        champs = {}
+        valeurs = (
+            ("nom", "Nom", objectif["nom"]),
+            ("montant_cible", "Montant cible (€)", objectif["montant_cible"]),
+            (
+                "montant_periodique",
+                "Épargne mensuelle prévue (€)",
+                objectif.get("montant_periodique", 0),
+            ),
+        )
+        for cle, indication, valeur in valeurs:
+            champ = ctk.CTkEntry(
+                fenetre, width=340, height=40, placeholder_text=indication
+            )
+            champ.insert(0, str(valeur))
+            champ.pack(pady=6)
+            champs[cle] = champ
+        zone_date = ctk.CTkFrame(fenetre, fg_color="transparent")
+        zone_date.pack(pady=6)
+        date_cible = ctk.CTkEntry(zone_date, width=290, height=40)
+        date_cible.insert(
+            0, datetime.fromisoformat(objectif["date_cible"]).strftime("%d/%m/%Y")
+        )
+        date_cible.pack(side="left")
+        ctk.CTkButton(
+            zone_date,
+            text="📅",
+            width=40,
+            height=40,
+            fg_color="#E8F2EE",
+            text_color=self.VERT,
+            command=lambda: self._ouvrir_calendrier_pour(
+                date_cible, "Choisir une date cible"
+            ),
+        ).pack(side="left", padx=(8, 0))
+        message = ctk.CTkLabel(fenetre, text="", text_color=self.ROUGE)
+        message.pack(pady=4)
+
+        def valider():
+            try:
+                cible = datetime.strptime(date_cible.get(), "%d/%m/%Y").date()
+                if cible <= datetime.now().date():
+                    raise ValueError(
+                        "La date cible doit être postérieure à aujourd'hui."
+                    )
+                self.on_modifier(
+                    objectif["id"],
+                    {
+                        "nom": champs["nom"].get().strip(),
+                        "montant_cible": self._montant(
+                            champs["montant_cible"], obligatoire=True
+                        ),
+                        "montant_actuel": float(objectif["montant_actuel"]),
+                        "montant_periodique": self._montant(
+                            champs["montant_periodique"]
+                        ),
+                        "date_cible": cible.isoformat(),
+                    },
+                )
+            except (ValueError, ConnectionError, OSError) as erreur:
+                message.configure(text=str(erreur))
+                return
+            fenetre.destroy()
+
+        ctk.CTkButton(
+            fenetre,
+            text="Enregistrer",
+            width=340,
+            height=42,
+            fg_color=self.VERT,
+            hover_color=self.VERT_FONCE,
+            command=valider,
+        ).pack(pady=8)
+
+    def _supprimer_objectif(self, objectif):
+        """Confirmer puis transmettre la suppression d'un objectif."""
+        if messagebox.askyesno(
+            "Confirmation",
+            f"Supprimer l'objectif « {objectif['nom']} » et ses versements ?",
+            parent=self.winfo_toplevel(),
+        ):
+            try:
+                self.on_supprimer(objectif["id"])
+            except (ValueError, ConnectionError, OSError) as erreur:
+                messagebox.showerror(
+                    "Suppression impossible",
+                    str(erreur),
+                    parent=self.winfo_toplevel(),
+                )
+
     def actualiser(self, objectifs):
         """Actualiser les objectifs et leurs indicateurs.
 
@@ -303,6 +426,26 @@ class VueObjectifs(ctk.CTkFrame):
                 font=("Arial", 14, "bold"),
                 text_color=self.TEXTE,
             ).pack(side="left")
+            ctk.CTkButton(
+                entete,
+                text="Supprimer",
+                width=75,
+                height=30,
+                fg_color="#FCE8E8",
+                hover_color="#F5D0D0",
+                text_color=self.ROUGE,
+                command=lambda o=objectif: self._supprimer_objectif(o),
+            ).pack(side="right", padx=(6, 0))
+            ctk.CTkButton(
+                entete,
+                text="Modifier",
+                width=75,
+                height=30,
+                fg_color="#E8F3EF",
+                hover_color="#D3E8DF",
+                text_color=self.VERT,
+                command=lambda o=objectif: self._ouvrir_modification(o),
+            ).pack(side="right", padx=(6, 0))
             if actuel < cible:
                 ctk.CTkButton(
                     entete,
@@ -357,7 +500,10 @@ class VueObjectifs(ctk.CTkFrame):
             if not objectif.get("objectif_atteignable", True):
                 ctk.CTkLabel(
                     carte,
-                    text="⚠ L'épargne disponible ce mois est inférieure au minimum nécessaire.",
+                    text=(
+                        "⚠ L'épargne disponible ce mois est inférieure "
+                        "au minimum nécessaire."
+                    ),
                     text_color=self.ROUGE,
                 ).pack(anchor="w", padx=16, pady=(5, 0))
             barre = ctk.CTkProgressBar(carte, progress_color=self.VERT, height=10)
