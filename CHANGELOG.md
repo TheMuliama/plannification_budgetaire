@@ -20,6 +20,9 @@
 
 ### Added
 
+- Fournir pour le compte de démonstration Richard un scénario reproductible
+  de six mois avec budgets, revenus, dépenses, alertes et objectifs d'épargne.
+
 - Exposer les états mensuels, le tableau de bord, les alertes à partir de
   80 %, les projections et la gestion complète des catégories et objectifs
   dans le protocole JSON/TCP.

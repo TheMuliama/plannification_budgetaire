@@ -98,6 +98,26 @@ Arrêter le serveur sans supprimer ses données :
 docker compose down
 ```
 
+## Compte de démonstration
+
+Le compte destiné à la présentation et aux tests du professeur est :
+
+```text
+Identifiant : richard.latchoumane@univ-reunion.fr
+Mot de passe : Richard-2026!
+```
+
+Il contient un scénario d'utilisation normal de juin à novembre 2026 :
+48 budgets mensuels, 14 revenus, 59 dépenses réalisées ou prévues, deux
+objectifs d'épargne et dix versements. Les données couvrent également les
+alertes à 80 %, l'évolution sur six mois et les opérations récurrentes.
+
+Le scénario peut être recréé sans modifier les autres comptes avec :
+
+```bash
+python -m scripts.peupler_compte_richard
+```
+
 ---
 
 ## Organisation des modules métier
