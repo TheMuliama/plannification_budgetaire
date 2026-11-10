@@ -48,55 +48,89 @@ Le client ne communique pas directement avec la base de données.
 
 Les services métier contiennent les responsabilités propres à l'application, tandis que les repositories assurent l'accès aux données.
 
-## Démarrage local
+## Installation et lancement
 
-Depuis la racine du dépôt :
+L'application fonctionne sous Linux et repose sur une architecture client-serveur :
+- **Serveur :** Python, exécuté avec Docker.
+- **Client :** interface graphique distribuée au format AppImage.
+- **Base de données :** SQLite (`budget.db`).
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
+### 1. Installation du serveur
 
-Démarrer le serveur dans un premier terminal :
+#### Prérequis
 
-```bash
-python -m serveur.main
-```
+Le serveur nécessite **Docker Engine** et **Docker Compose v2**.
 
-Puis démarrer l'application graphique dans un second terminal :
+Vérifier leur installation :
 
 ```bash
-python client/main.py
+docker --version
+docker compose version
 ```
 
-Le serveur écoute par défaut sur `127.0.0.1:8765` et initialise la base
-`persistance/data/budget.db`. Les nouvelles bases SQLite de ce dossier sont
-ignorées par Git afin de ne pas publier de données personnelles. Le dépôt peut
-néanmoins fournir un instantané de démonstration explicitement suivi, qui doit
-contenir uniquement des données fictives.
+Si Docker Compose v2 est absent, sur Ubuntu 24.04 ou Linux Mint compatible :
 
-## Installation du serveur avec Docker
+```bash
+sudo apt update
+sudo apt install docker-compose-v2
+```
 
-Construire et démarrer uniquement le serveur :
+#### Récupérer le projet
+
+```bash
+git clone https://github.com/TheMuliama/plannification_budgetaire.git
+cd plannification_budgetaire
+```
+
+#### Démarrer le serveur
 
 ```bash
 docker compose up --build -d
 ```
 
-Le port `8765` du serveur est alors disponible uniquement sur l'interface
-locale de la machine. Les données SQLite sont conservées dans le volume Docker
-`budget_data`. Le client graphique reste lancé depuis l'environnement local :
+Vérifier son fonctionnement :
 
 ```bash
-python client/main.py
+docker compose ps
 ```
 
-Arrêter le serveur sans supprimer ses données :
+Le serveur est accessible localement sur `127.0.0.1:8766`.
+
+### 2. Installation du client Linux
+
+Le client est disponible au format **AppImage**. Aucune installation de Python ou des dépendances Python n'est nécessaire.
+
+1. Accéder aux [GitHub Releases](https://github.com/TheMuliama/plannification_budgetaire/releases).
+2. Télécharger `Budget-x86_64.AppImage`.
+3. Ouvrir un terminal dans le dossier contenant le fichier.
+
+Autoriser son exécution :
+
+```bash
+chmod +x Budget-x86_64.AppImage
+```
+
+Lancer l'application :
+
+```bash
+./Budget-x86_64.AppImage
+```
+
+**Important :** le serveur Docker doit être démarré avant l'utilisation du client. Cette configuration nécessite que les deux programmes fonctionnent sur le même ordinateur.
+
+### 3. Arrêter le serveur
+
+Depuis le dossier du projet :
 
 ```bash
 docker compose down
 ```
+
+Les données sont conservées dans `persistance/data/budget.db`.
+
+### 4. Documentation
+
+Pour davantage d'informations, consultez la notice d'installation et d'utilisation fournie avec le projet.
 
 ## Compte de démonstration
 
