@@ -2,4 +2,4 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 persistance/data/*.db
-!persistance/data/budget.db
+.venv/

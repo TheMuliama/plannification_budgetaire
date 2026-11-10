@@ -38,6 +38,7 @@ erDiagram
         REAL montant
         TEXT date
         TEXT description
+        TEXT categorie
         TEXT statut
     }
 
@@ -77,6 +78,14 @@ erDiagram
         TEXT date_cible
     }
 
+    VERSEMENTS_EPARGNE {
+        INTEGER id PK
+        INTEGER utilisateur_id FK
+        INTEGER objectif_id FK
+        REAL montant
+        TEXT date
+    }
+
     ALERTES {
         INTEGER id PK
         INTEGER utilisateur_id FK
@@ -105,6 +114,8 @@ erDiagram
     COMPTES ||--|{ SOLDES : "possède"
 
     UTILISATEURS ||--o{ OBJECTIFS_EPARGNE : "possède"
+    UTILISATEURS ||--o{ VERSEMENTS_EPARGNE : "effectue"
+    OBJECTIFS_EPARGNE ||--o{ VERSEMENTS_EPARGNE : "reçoit"
 
     UTILISATEURS ||--o{ ALERTES : "reçoit"
     BUDGETS ||--o{ ALERTES : "déclenche"

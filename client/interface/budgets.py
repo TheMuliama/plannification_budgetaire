@@ -1,19 +1,9 @@
-
 """Écran de gestion des budgets côté client."""
 
-import customtkinter as ctk
 from tkinter import messagebox
 
-
-def centrer_fenetre(fenetre, parent, largeur, hauteur):
-    """Centrer une fenêtre par rapport à son parent."""
-
-    parent.update_idletasks()
-
-    x = parent.winfo_rootx() + (parent.winfo_width() - largeur) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - hauteur) // 2
-
-    fenetre.geometry(f"{largeur}x{hauteur}+{max(0, x)}+{max(0, y)}")
+import customtkinter as ctk
+from interface.outils import centrer_fenetre
 
 
 class VueBudgets(ctk.CTkFrame):
@@ -28,17 +18,39 @@ class VueBudgets(ctk.CTkFrame):
         master,
         on_ajouter=None,
         on_modifier=None,
-        on_supprimer=None
+        on_supprimer=None,
+        on_modifier_categorie=None,
+        on_supprimer_categorie=None,
+        on_modifier_sous_categorie=None,
+        on_supprimer_sous_categorie=None,
     ):
+        """Initialiser la vue et ses fonctions de rappel.
+
+        Args:
+            master: Conteneur graphique parent.
+            on_ajouter: Fonction d'ajout d'un budget.
+            on_modifier: Fonction de modification d'un budget.
+            on_supprimer: Fonction de suppression d'un budget.
+            on_modifier_categorie: Fonction de renommage d'une catégorie.
+            on_supprimer_categorie: Fonction de suppression d'une catégorie.
+            on_modifier_sous_categorie: Fonction de renommage d'une sous-catégorie.
+            on_supprimer_sous_categorie: Fonction de suppression d'une sous-catégorie.
+        """
         super().__init__(master, fg_color="#F5F3EF")
 
         # Fonctions de rappel
         self.on_ajouter = on_ajouter
         self.on_modifier = on_modifier
         self.on_supprimer = on_supprimer
+        self.on_modifier_categorie = on_modifier_categorie
+        self.on_supprimer_categorie = on_supprimer_categorie
+        self.on_modifier_sous_categorie = on_modifier_sous_categorie
+        self.on_supprimer_sous_categorie = on_supprimer_sous_categorie
 
         # Données reçues de l'extérieur
         self.budgets = []
+        self.categories = []
+        self.sous_categories = []
 
         # Couleurs
         self.vert = "#00634F"
@@ -56,21 +68,14 @@ class VueBudgets(ctk.CTkFrame):
         """Construire l'interface des budgets."""
 
         # En-tête
-        self.entete = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
-        )
-        self.entete.pack(
-            fill="x",
-            padx=25,
-            pady=(25, 15)
-        )
+        self.entete = ctk.CTkFrame(self, fg_color="transparent")
+        self.entete.pack(fill="x", padx=25, pady=(25, 15))
 
         ctk.CTkLabel(
             self.entete,
             text="Gestion des budgets",
             font=("Arial", 26, "bold"),
-            text_color=self.texte
+            text_color=self.texte,
         ).pack(side="left")
 
         ctk.CTkButton(
@@ -81,61 +86,42 @@ class VueBudgets(ctk.CTkFrame):
             corner_radius=8,
             fg_color=self.vert,
             hover_color=self.vert_fonce,
-            command=self.ouvrir_ajout
+            command=self.ouvrir_ajout,
         ).pack(side="right")
 
+        ctk.CTkButton(
+            self.entete,
+            text="Gérer les catégories",
+            width=170,
+            height=40,
+            corner_radius=8,
+            fg_color="#E8F3EF",
+            hover_color="#D3E8DF",
+            text_color=self.vert,
+            command=self.ouvrir_gestion_categories,
+        ).pack(side="right", padx=(0, 10))
+
         # Zone de résumé
-        self.resume = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
-        )
-        self.resume.pack(
-            fill="x",
-            padx=25,
-            pady=(0, 15)
-        )
+        self.resume = ctk.CTkFrame(self, fg_color="transparent")
+        self.resume.pack(fill="x", padx=25, pady=(0, 15))
 
-        self.carte_total = self._creer_carte(
-            self.resume,
-            "Budget total",
-            "0,00 €"
-        )
+        self.carte_total = self._creer_carte(self.resume, "Budget total", "0,00 €")
 
-        self.carte_depense = self._creer_carte(
-            self.resume,
-            "Total dépensé",
-            "0,00 €"
-        )
+        self.carte_depense = self._creer_carte(self.resume, "Total dépensé", "0,00 €")
 
-        self.carte_restant = self._creer_carte(
-            self.resume,
-            "Budget restant",
-            "0,00 €"
-        )
+        self.carte_restant = self._creer_carte(self.resume, "Budget restant", "0,00 €")
 
         # Titre de la liste
         ctk.CTkLabel(
             self,
             text="Budgets par catégorie",
             font=("Arial", 18, "bold"),
-            text_color=self.texte
-        ).pack(
-            anchor="w",
-            padx=25,
-            pady=(10, 10)
-        )
+            text_color=self.texte,
+        ).pack(anchor="w", padx=25, pady=(10, 10))
 
         # Liste défilante
-        self.liste_budgets = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent"
-        )
-        self.liste_budgets.pack(
-            fill="both",
-            expand=True,
-            padx=25,
-            pady=(0, 20)
-        )
+        self.liste_budgets = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.liste_budgets.pack(fill="both", expand=True, padx=25, pady=(0, 20))
 
         self._afficher_budgets()
 
@@ -147,72 +133,42 @@ class VueBudgets(ctk.CTkFrame):
             fg_color=self.blanc,
             corner_radius=10,
             border_width=1,
-            border_color="#E5E5E5"
+            border_color="#E5E5E5",
         )
-        carte.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            padx=5
-        )
+        carte.pack(side="left", fill="x", expand=True, padx=5)
 
-        ctk.CTkLabel(
-            carte,
-            text=titre,
-            font=("Arial", 12),
-            text_color=self.gris
-        ).pack(
-            anchor="w",
-            padx=15,
-            pady=(15, 5)
+        ctk.CTkLabel(carte, text=titre, font=("Arial", 12), text_color=self.gris).pack(
+            anchor="w", padx=15, pady=(15, 5)
         )
 
         montant = ctk.CTkLabel(
-            carte,
-            text=valeur,
-            font=("Arial", 22, "bold"),
-            text_color=self.texte
+            carte, text=valeur, font=("Arial", 22, "bold"), text_color=self.texte
         )
-        montant.pack(
-            anchor="w",
-            padx=15,
-            pady=(0, 15)
-        )
+        montant.pack(anchor="w", padx=15, pady=(0, 15))
 
         return montant
 
     def actualiser(self, budgets, resume=None):
-        """Actualiser les informations affichées.
+        """Actualiser les budgets et leur résumé.
 
-        budgets : liste de dictionnaires contenant :
-            id, categorie, plafond, depense,
-            progression, restant, alerte.
-
-        resume : dictionnaire contenant :
-            total, depense, restant.
-
-        Les calculs sont effectués à l'extérieur.
+        Args:
+            budgets: Budgets contenant leurs montants et leur progression.
+            resume: Totaux facultatifs de la période affichée.
         """
 
         self.budgets = list(budgets)
 
         if resume is not None:
             self.carte_total.configure(
-                text=self._formater_montant(
-                    resume.get("total", 0)
-                )
+                text=self._formater_montant(resume.get("total", 0))
             )
 
             self.carte_depense.configure(
-                text=self._formater_montant(
-                    resume.get("depense", 0)
-                )
+                text=self._formater_montant(resume.get("depense", 0))
             )
 
             self.carte_restant.configure(
-                text=self._formater_montant(
-                    resume.get("restant", 0)
-                )
+                text=self._formater_montant(resume.get("restant", 0))
             )
         else:
             self.carte_total.configure(text="—")
@@ -221,14 +177,129 @@ class VueBudgets(ctk.CTkFrame):
 
         self._afficher_budgets()
 
+    def definir_categories(self, categories, sous_categories):
+        """Mémoriser les classements administrables dans cette vue.
+
+        Args:
+            categories: Catégories appartenant à l'utilisateur.
+            sous_categories: Sous-catégories de ces catégories.
+        """
+        self.categories = list(categories)
+        self.sous_categories = list(sous_categories)
+
+    def ouvrir_gestion_categories(self):
+        """Afficher les actions de renommage et suppression des classements."""
+        fenetre = ctk.CTkToplevel(self)
+        fenetre.title("Gérer les catégories")
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 560, 560)
+        fenetre.configure(fg_color=self.beige)
+        fenetre.transient(self.winfo_toplevel())
+        fenetre.grab_set()
+
+        ctk.CTkLabel(
+            fenetre,
+            text="Catégories et sous-catégories",
+            font=("Arial", 21, "bold"),
+            text_color=self.texte,
+        ).pack(anchor="w", padx=24, pady=(22, 5))
+        ctk.CTkLabel(
+            fenetre,
+            text="Supprimer une catégorie supprime aussi ses budgets et dépenses.",
+            text_color=self.rouge,
+        ).pack(anchor="w", padx=24, pady=(0, 12))
+        liste = ctk.CTkScrollableFrame(fenetre, fg_color="transparent")
+        liste.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        if not self.categories:
+            ctk.CTkLabel(
+                liste, text="Aucune catégorie.", text_color=self.gris
+            ).pack(pady=40)
+            return
+        for categorie in self.categories:
+            self._creer_ligne_classement(fenetre, liste, categorie, None)
+            for sous_categorie in self.sous_categories:
+                if sous_categorie["categorie_id"] == categorie["id"]:
+                    self._creer_ligne_classement(
+                        fenetre, liste, sous_categorie, categorie
+                    )
+
+    def _creer_ligne_classement(self, fenetre, parent, element, categorie):
+        """Créer une ligne d'administration de catégorie ou sous-catégorie."""
+        ligne = ctk.CTkFrame(parent, fg_color=self.blanc, corner_radius=8)
+        ligne.pack(fill="x", pady=4, padx=(24 if categorie else 0, 0))
+        prefixe = "↳ " if categorie else ""
+        ctk.CTkLabel(
+            ligne,
+            text=prefixe + element["nom"],
+            text_color=self.texte,
+            font=("Arial", 13, "bold" if categorie is None else "normal"),
+        ).pack(side="left", padx=12, pady=12)
+        ctk.CTkButton(
+            ligne,
+            text="Supprimer",
+            width=78,
+            fg_color="#FCE8E8",
+            hover_color="#F5D0D0",
+            text_color=self.rouge,
+            command=lambda: self._supprimer_classement(
+                fenetre, element, categorie
+            ),
+        ).pack(side="right", padx=(4, 8), pady=7)
+        ctk.CTkButton(
+            ligne,
+            text="Renommer",
+            width=78,
+            fg_color="#E8F3EF",
+            hover_color="#D3E8DF",
+            text_color=self.vert,
+            command=lambda: self._renommer_classement(
+                fenetre, element, categorie
+            ),
+        ).pack(side="right", padx=4, pady=7)
+
+    def _renommer_classement(self, fenetre, element, categorie):
+        """Demander un nouveau nom et transmettre la modification."""
+        dialogue = ctk.CTkInputDialog(
+            text=f"Nouveau nom pour « {element['nom']} » :",
+            title="Renommer",
+        )
+        nouveau_nom = dialogue.get_input()
+        if not nouveau_nom or not nouveau_nom.strip():
+            return
+        try:
+            if categorie is None:
+                self.on_modifier_categorie(element["id"], nouveau_nom.strip())
+            else:
+                self.on_modifier_sous_categorie(
+                    categorie["id"], element["id"], nouveau_nom.strip()
+                )
+        except (ConnectionError, OSError, ValueError) as erreur:
+            messagebox.showerror("Modification impossible", str(erreur), parent=fenetre)
+            return
+        fenetre.destroy()
+
+    def _supprimer_classement(self, fenetre, element, categorie):
+        """Confirmer puis transmettre la suppression d'un classement."""
+        if not messagebox.askyesno(
+            "Confirmation",
+            f"Supprimer « {element['nom']} » ?",
+            parent=fenetre,
+        ):
+            return
+        try:
+            if categorie is None:
+                self.on_supprimer_categorie(element["id"])
+            else:
+                self.on_supprimer_sous_categorie(categorie["id"], element["id"])
+        except (ConnectionError, OSError, ValueError) as erreur:
+            messagebox.showerror("Suppression impossible", str(erreur), parent=fenetre)
+            return
+        fenetre.destroy()
+
     def _formater_montant(self, montant):
         """Formater un montant pour l'affichage."""
 
-        return (
-            f"{float(montant):,.2f} €"
-            .replace(",", " ")
-            .replace(".", ",")
-        )
+        return f"{float(montant):,.2f} €".replace(",", " ").replace(".", ",")
 
     def _afficher_budgets(self):
         """Afficher les budgets reçus."""
@@ -242,7 +313,7 @@ class VueBudgets(ctk.CTkFrame):
                 self.liste_budgets,
                 text="Aucun budget défini pour le moment.",
                 font=("Arial", 14),
-                text_color=self.gris
+                text_color=self.gris,
             ).pack(pady=50)
 
             return
@@ -258,34 +329,18 @@ class VueBudgets(ctk.CTkFrame):
             fg_color=self.blanc,
             corner_radius=10,
             border_width=1,
-            border_color="#E5E5E5"
+            border_color="#E5E5E5",
         )
-        carte.pack(
-            fill="x",
-            pady=7
-        )
+        carte.pack(fill="x", pady=7)
 
         # Partie supérieure
-        haut = ctk.CTkFrame(
-            carte,
-            fg_color="transparent"
-        )
-        haut.pack(
-            fill="x",
-            padx=20,
-            pady=(15, 5)
-        )
+        haut = ctk.CTkFrame(carte, fg_color="transparent")
+        haut.pack(fill="x", padx=20, pady=(15, 5))
 
-        categorie = budget.get(
-            "categorie",
-            "Sans catégorie"
-        )
+        categorie = budget.get("libelle", budget.get("categorie", "Sans catégorie"))
 
         ctk.CTkLabel(
-            haut,
-            text=categorie,
-            font=("Arial", 16, "bold"),
-            text_color=self.texte
+            haut, text=categorie, font=("Arial", 16, "bold"), text_color=self.texte
         ).pack(side="left")
 
         # Bouton supprimer
@@ -297,7 +352,7 @@ class VueBudgets(ctk.CTkFrame):
             fg_color="#FCE8E8",
             hover_color="#F5D0D0",
             text_color=self.rouge,
-            command=lambda b=budget: self.supprimer_budget(b)
+            command=lambda b=budget: self.supprimer_budget(b),
         ).pack(side="right", padx=5)
 
         # Bouton modifier
@@ -309,7 +364,7 @@ class VueBudgets(ctk.CTkFrame):
             fg_color="#E8F3EF",
             hover_color="#D3E8DF",
             text_color=self.vert,
-            command=lambda b=budget: self.ouvrir_modification(b)
+            command=lambda b=budget: self.ouvrir_modification(b),
         ).pack(side="right", padx=5)
 
         # Montants
@@ -318,65 +373,40 @@ class VueBudgets(ctk.CTkFrame):
         restant = budget.get("restant", 0)
 
         texte_montant = (
-            f"{self._formater_montant(depense)} / "
-            f"{self._formater_montant(plafond)}"
+            f"{self._formater_montant(depense)} / {self._formater_montant(plafond)}"
         )
 
         ctk.CTkLabel(
-            carte,
-            text=texte_montant,
-            font=("Arial", 13),
-            text_color=self.gris
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(5, 5)
-        )
+            carte, text=texte_montant, font=("Arial", 13), text_color=self.gris
+        ).pack(anchor="w", padx=20, pady=(5, 5))
 
         # Progression fournie par la logique externe
         progression = budget.get("progression", 0)
 
         # Limiter uniquement l'affichage de la barre
-        progression_visuelle = max(
-            0,
-            min(1, float(progression))
-        )
+        progression_visuelle = max(0, min(1, float(progression)))
 
         couleur = self.vert
 
         if budget.get("alerte") == "attention":
             couleur = self.orange
 
-        elif budget.get("alerte") == "depasse":
+        elif budget.get("alerte") == "risque":
             couleur = self.rouge
 
         barre = ctk.CTkProgressBar(
-            carte,
-            height=10,
-            progress_color=couleur,
-            fg_color="#EAEAEA"
+            carte, height=10, progress_color=couleur, fg_color="#EAEAEA"
         )
-        barre.pack(
-            fill="x",
-            padx=20,
-            pady=5
-        )
+        barre.pack(fill="x", padx=20, pady=5)
         barre.set(progression_visuelle)
 
         # Budget restant
         ctk.CTkLabel(
             carte,
-            text=(
-                "Restant : "
-                f"{self._formater_montant(restant)}"
-            ),
+            text=(f"Restant : {self._formater_montant(restant)}"),
             font=("Arial", 12),
-            text_color=self.gris
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(5, 15)
-        )
+            text_color=self.gris,
+        ).pack(anchor="w", padx=20, pady=(5, 15))
 
     def ouvrir_ajout(self):
         """Ouvrir le formulaire d'ajout."""
@@ -384,7 +414,11 @@ class VueBudgets(ctk.CTkFrame):
         self._ouvrir_formulaire()
 
     def ouvrir_modification(self, budget):
-        """Ouvrir le formulaire de modification."""
+        """Ouvrir le formulaire de modification d'un budget.
+
+        Args:
+            budget: Budget à préremplir dans le formulaire.
+        """
 
         self._ouvrir_formulaire(budget)
 
@@ -394,133 +428,107 @@ class VueBudgets(ctk.CTkFrame):
         modification = budget is not None
 
         fenetre = ctk.CTkToplevel(self)
-        fenetre.title(
-            "Modifier un budget"
-            if modification
-            else "Ajouter un budget"
-        )
+        fenetre.title("Modifier un budget" if modification else "Ajouter un budget")
 
-        centrer_fenetre(fenetre, self.winfo_toplevel(), 430, 400)
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 430, 485)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
         fenetre.grab_set()
 
-        titre = (
-            "Modifier un budget"
-            if modification
-            else "Nouveau budget"
-        )
+        titre = "Modifier un budget" if modification else "Nouveau budget"
 
         ctk.CTkLabel(
-            fenetre,
-            text=titre,
-            font=("Arial", 22, "bold"),
-            text_color=self.texte
+            fenetre, text=titre, font=("Arial", 22, "bold"), text_color=self.texte
         ).pack(pady=(25, 20))
 
         # Champ catégorie
-        ctk.CTkLabel(
-            fenetre,
-            text="Catégorie",
-            text_color=self.texte
-        ).pack(anchor="w", padx=45)
+        ctk.CTkLabel(fenetre, text="Catégorie", text_color=self.texte).pack(
+            anchor="w", padx=45
+        )
 
         champ_categorie = ctk.CTkEntry(
-            fenetre,
-            width=340,
-            height=40,
-            placeholder_text="Nom de la catégorie"
+            fenetre, width=340, height=40, placeholder_text="Nom de la catégorie"
         )
         champ_categorie.pack(pady=(5, 15))
 
-        # Champ plafond
         ctk.CTkLabel(
-            fenetre,
-            text="Plafond mensuel (€)",
-            text_color=self.texte
+            fenetre, text="Sous-catégorie (facultative)", text_color=self.texte
         ).pack(anchor="w", padx=45)
-
-        champ_plafond = ctk.CTkEntry(
+        champ_sous_categorie = ctk.CTkEntry(
             fenetre,
             width=340,
             height=40,
-            placeholder_text="Exemple : 200"
+            placeholder_text="Exemple : Supermarché, Restaurant...",
+        )
+        champ_sous_categorie.pack(pady=(5, 15))
+
+        # Champ plafond
+        ctk.CTkLabel(fenetre, text="Plafond mensuel (€)", text_color=self.texte).pack(
+            anchor="w", padx=45
+        )
+
+        champ_plafond = ctk.CTkEntry(
+            fenetre, width=340, height=40, placeholder_text="Exemple : 200"
         )
         champ_plafond.pack(pady=(5, 15))
 
         if modification:
             champ_categorie.insert(
-                0,
-                str(budget.get("categorie", ""))
+                0, str(budget.get("categorie_parent", budget.get("categorie", "")))
             )
 
-            champ_plafond.insert(
-                0,
-                str(budget.get("plafond", ""))
-            )
+            if budget.get("sous_categorie"):
+                champ_sous_categorie.insert(0, str(budget["sous_categorie"]))
 
-        message = ctk.CTkLabel(
-            fenetre,
-            text="",
-            text_color=self.rouge,
-            wraplength=340
-        )
+            champ_plafond.insert(0, str(budget.get("plafond", "")))
+
+        message = ctk.CTkLabel(fenetre, text="", text_color=self.rouge, wraplength=340)
         message.pack(pady=5)
 
         def valider():
             categorie = champ_categorie.get().strip()
-            texte_plafond = (
-                champ_plafond.get()
-                .strip()
-                .replace(",", ".")
-            )
+            sous_categorie = champ_sous_categorie.get().strip() or None
+            texte_plafond = champ_plafond.get().strip().replace(",", ".")
 
             if not categorie or not texte_plafond:
-                message.configure(
-                    text="Veuillez remplir tous les champs."
-                )
+                message.configure(text="Veuillez remplir tous les champs.")
                 return
 
             try:
                 plafond = float(texte_plafond)
             except ValueError:
-                message.configure(
-                    text="Veuillez saisir un montant valide."
-                )
+                message.configure(text="Veuillez saisir un montant valide.")
                 return
 
             if plafond <= 0:
-                message.configure(
-                    text="Le plafond doit être supérieur à zéro."
-                )
+                message.configure(text="Le plafond doit être supérieur à zéro.")
                 return
 
             # Transmettre les informations
             if modification:
                 if self.on_modifier is None:
-                    message.configure(
-                        text="Modification non configurée."
-                    )
+                    message.configure(text="Modification non configurée.")
                     return
 
-                self.on_modifier(
-                    budget.get("id"),
-                    categorie,
-                    plafond
-                )
+                try:
+                    self.on_modifier(
+                        budget.get("id"), categorie, sous_categorie, plafond
+                    )
+                except (ConnectionError, OSError, ValueError) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             else:
                 if self.on_ajouter is None:
-                    message.configure(
-                        text="Ajout non configuré."
-                    )
+                    message.configure(text="Ajout non configuré.")
                     return
 
-                self.on_ajouter(
-                    categorie,
-                    plafond
-                )
+                try:
+                    self.on_ajouter(categorie, sous_categorie, plafond)
+                except (ConnectionError, OSError, ValueError) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             fenetre.destroy()
 
@@ -531,42 +539,36 @@ class VueBudgets(ctk.CTkFrame):
             height=42,
             fg_color=self.vert,
             hover_color=self.vert_fonce,
-            command=valider
+            command=valider,
         ).pack(pady=10)
 
     def supprimer_budget(self, budget):
-        """Demander la suppression d'un budget."""
+        """Demander la confirmation puis supprimer un budget.
+
+        Args:
+            budget: Budget sélectionné dans la liste.
+        """
 
         confirmation = messagebox.askyesno(
             "Confirmation",
             "Voulez-vous vraiment supprimer le budget "
-            f"« {budget.get('categorie', '')} » ?",
-            parent=self.winfo_toplevel()
+            f"« {budget.get('libelle', budget.get('categorie', ''))} » ?",
+            parent=self.winfo_toplevel(),
         )
 
         if not confirmation:
             return
 
         if self.on_supprimer:
-            self.on_supprimer(
-                budget.get("id")
-            )
+            self.on_supprimer(budget.get("id"))
         else:
             messagebox.showwarning(
                 "Action indisponible",
                 "La suppression n'est pas configurée.",
-                parent=self.winfo_toplevel()
+                parent=self.winfo_toplevel(),
             )
 
     def vider(self):
         """Réinitialiser les données affichées."""
 
-        self.actualiser(
-            budgets=[],
-            resume={
-                "total": 0,
-                "depense": 0,
-                "restant": 0
-            }
-        )
-
+        self.actualiser(budgets=[], resume={"total": 0, "depense": 0, "restant": 0})

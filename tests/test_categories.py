@@ -19,39 +19,58 @@ def gestionnaire_categories() -> GestionnaireCategories:
     connexion = Database().connecter(":memory:")
     schema = Path("persistance/schema.sql").read_text(encoding="utf-8")
     connexion.executescript(schema)
+    connexion.executemany(
+        "INSERT INTO utilisateurs (identifiant, mot_de_passe) VALUES (?, ?)",
+        (("utilisateur-1", "hachage-fictif-1"), ("utilisateur-2", "hachage-fictif-2")),
+    )
     yield GestionnaireCategories(RepositoryCategories(connexion))
     connexion.close()
 
 
-def test_creer_et_recuperer_une_categorie(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_creer_et_recuperer_une_categorie(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier qu'une catégorie créée peut être récupérée par son propriétaire."""
     categorie = gestionnaire_categories.creer_categorie(1, "Alimentation")
 
-    categorie_recuperee = gestionnaire_categories.recuperer_categorie(1, categorie["id"])
+    categorie_recuperee = gestionnaire_categories.recuperer_categorie(
+        1, categorie["id"]
+    )
 
     assert categorie_recuperee == categorie
 
 
-def test_recuperer_les_categories_d_un_utilisateur(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_recuperer_les_categories_d_un_utilisateur(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier que la liste retourne toutes les catégories du propriétaire."""
     gestionnaire_categories.creer_categorie(1, "Alimentation")
     gestionnaire_categories.creer_categorie(1, "Transport")
 
     categories = gestionnaire_categories.recuperer_categories(1)
 
-    assert [categorie["nom"] for categorie in categories] == ["Alimentation", "Transport"]
+    assert [categorie["nom"] for categorie in categories] == [
+        "Alimentation",
+        "Transport",
+    ]
 
 
-def test_modifier_une_categorie(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_modifier_une_categorie(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier que le nom d'une catégorie peut être modifié."""
     categorie = gestionnaire_categories.creer_categorie(1, "Courses")
 
-    categorie_modifiee = gestionnaire_categories.modifier_categorie(1, categorie["id"], "Alimentation")
+    categorie_modifiee = gestionnaire_categories.modifier_categorie(
+        1, categorie["id"], "Alimentation"
+    )
 
     assert categorie_modifiee["nom"] == "Alimentation"
 
 
-def test_supprimer_une_categorie(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_supprimer_une_categorie(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier qu'une catégorie supprimée n'est plus récupérable."""
     categorie = gestionnaire_categories.creer_categorie(1, "Loisirs")
 
@@ -61,21 +80,32 @@ def test_supprimer_une_categorie(gestionnaire_categories: GestionnaireCategories
         gestionnaire_categories.recuperer_categorie(1, categorie["id"])
 
 
-def test_creer_et_recuperer_des_sous_categories(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_creer_et_recuperer_des_sous_categories(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier que les sous-catégories sont rattachées à leur catégorie."""
     categorie = gestionnaire_categories.creer_categorie(1, "Alimentation")
     gestionnaire_categories.creer_sous_categorie(1, categorie["id"], "Marché")
     gestionnaire_categories.creer_sous_categorie(1, categorie["id"], "Restaurant")
 
-    sous_categories = gestionnaire_categories.recuperer_sous_categories(1, categorie["id"])
+    sous_categories = gestionnaire_categories.recuperer_sous_categories(
+        1, categorie["id"]
+    )
 
-    assert [sous_categorie["nom"] for sous_categorie in sous_categories] == ["Marché", "Restaurant"]
+    assert [sous_categorie["nom"] for sous_categorie in sous_categories] == [
+        "Marché",
+        "Restaurant",
+    ]
 
 
-def test_modifier_une_sous_categorie(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_modifier_une_sous_categorie(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier que le nom d'une sous-catégorie peut être modifié."""
     categorie = gestionnaire_categories.creer_categorie(1, "Transport")
-    sous_categorie = gestionnaire_categories.creer_sous_categorie(1, categorie["id"], "Bus")
+    sous_categorie = gestionnaire_categories.creer_sous_categorie(
+        1, categorie["id"], "Bus"
+    )
 
     sous_categorie_modifiee = gestionnaire_categories.modifier_sous_categorie(
         1,
@@ -87,22 +117,56 @@ def test_modifier_une_sous_categorie(gestionnaire_categories: GestionnaireCatego
     assert sous_categorie_modifiee["nom"] == "Train"
 
 
-def test_supprimer_une_sous_categorie(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_supprimer_une_sous_categorie(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier qu'une sous-catégorie supprimée n'est plus listée."""
     categorie = gestionnaire_categories.creer_categorie(1, "Logement")
-    sous_categorie = gestionnaire_categories.creer_sous_categorie(1, categorie["id"], "Loyer")
+    sous_categorie = gestionnaire_categories.creer_sous_categorie(
+        1, categorie["id"], "Loyer"
+    )
 
-    gestionnaire_categories.supprimer_sous_categorie(1, categorie["id"], sous_categorie["id"])
+    gestionnaire_categories.supprimer_sous_categorie(
+        1, categorie["id"], sous_categorie["id"]
+    )
 
     assert gestionnaire_categories.recuperer_sous_categories(1, categorie["id"]) == []
 
 
-def test_isoler_les_categories_par_utilisateur(gestionnaire_categories: GestionnaireCategories) -> None:
+def test_isoler_les_categories_par_utilisateur(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
     """Vérifier qu'un utilisateur ne récupère pas les catégories d'un autre."""
-    categorie_utilisateur_un = gestionnaire_categories.creer_categorie(1, "Alimentation")
+    categorie_utilisateur_un = gestionnaire_categories.creer_categorie(
+        1, "Alimentation"
+    )
     categorie_utilisateur_deux = gestionnaire_categories.creer_categorie(2, "Voyages")
 
     assert gestionnaire_categories.recuperer_categories(1) == [categorie_utilisateur_un]
-    assert gestionnaire_categories.recuperer_categories(2) == [categorie_utilisateur_deux]
+    assert gestionnaire_categories.recuperer_categories(2) == [
+        categorie_utilisateur_deux
+    ]
     with pytest.raises(ValueError):
         gestionnaire_categories.recuperer_categorie(2, categorie_utilisateur_un["id"])
+
+
+def test_refuser_un_nom_vide(gestionnaire_categories: GestionnaireCategories) -> None:
+    """Vérifier qu'une catégorie doit posséder un nom exploitable."""
+    with pytest.raises(ValueError, match="obligatoire"):
+        gestionnaire_categories.creer_categorie(1, "   ")
+
+
+def test_normaliser_le_nom(gestionnaire_categories: GestionnaireCategories) -> None:
+    """Retirer les espaces inutiles autour du nom."""
+    categorie = gestionnaire_categories.creer_categorie(1, "  Alimentation  ")
+
+    assert categorie["nom"] == "Alimentation"
+
+
+def test_refuser_une_categorie_dupliquee(
+    gestionnaire_categories: GestionnaireCategories,
+) -> None:
+    gestionnaire_categories.creer_categorie(1, "Alimentation")
+
+    with pytest.raises(ValueError, match="existe déjà"):
+        gestionnaire_categories.creer_categorie(1, "Alimentation")

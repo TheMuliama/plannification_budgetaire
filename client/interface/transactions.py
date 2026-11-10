@@ -1,4 +1,3 @@
-
 """Écran des transactions côté client."""
 
 from datetime import datetime
@@ -6,18 +5,8 @@ from decimal import Decimal, InvalidOperation
 from tkinter import messagebox
 
 import customtkinter as ctk
+from interface.outils import centrer_fenetre
 from tkcalendar import Calendar
-
-
-def centrer_fenetre(fenetre, parent, largeur, hauteur):
-    """Centrer une fenêtre par rapport à son parent."""
-
-    parent.update_idletasks()
-
-    x = parent.winfo_rootx() + (parent.winfo_width() - largeur) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - hauteur) // 2
-
-    fenetre.geometry(f"{largeur}x{hauteur}+{max(0, x)}+{max(0, y)}")
 
 
 class VueTransactions(ctk.CTkFrame):
@@ -26,13 +15,15 @@ class VueTransactions(ctk.CTkFrame):
     Cette classe ne contient pas de logique de gestion financière.
     """
 
-    def __init__(
-        self,
-        master,
-        on_ajouter=None,
-        on_modifier=None,
-        on_supprimer=None
-    ):
+    CATEGORIES_REVENUS = (
+        "Salaire",
+        "Remboursement",
+        "Cadeau",
+        "Prime",
+        "Autre",
+    )
+
+    def __init__(self, master, on_ajouter=None, on_modifier=None, on_supprimer=None):
         super().__init__(master, fg_color="#F5F3EF")
 
         # Fonctions de rappel
@@ -59,21 +50,14 @@ class VueTransactions(ctk.CTkFrame):
         """Construire l'interface des transactions."""
 
         # En-tête
-        entete = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
-        )
-        entete.pack(
-            fill="x",
-            padx=25,
-            pady=(25, 15)
-        )
+        entete = ctk.CTkFrame(self, fg_color="transparent")
+        entete.pack(fill="x", padx=25, pady=(25, 15))
 
         ctk.CTkLabel(
             entete,
             text="Transactions",
             font=("Arial", 26, "bold"),
-            text_color=self.texte
+            text_color=self.texte,
         ).pack(side="left")
 
         ctk.CTkButton(
@@ -84,104 +68,80 @@ class VueTransactions(ctk.CTkFrame):
             corner_radius=8,
             fg_color=self.vert,
             hover_color=self.vert_fonce,
-            command=self.ouvrir_ajout
+            command=self.ouvrir_ajout,
         ).pack(side="right")
 
         # Cartes récapitulatives
-        resume = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
-        )
-        resume.pack(
-            fill="x",
-            padx=20,
-            pady=(0, 15)
-        )
+        resume = ctk.CTkFrame(self, fg_color="transparent")
+        resume.pack(fill="x", padx=20, pady=(0, 15))
 
-        self.carte_revenus = self._creer_carte(
-            resume,
-            "Total des revenus"
-        )
+        self.carte_revenus = self._creer_carte(resume, "Total des revenus")
 
-        self.carte_depenses = self._creer_carte(
-            resume,
-            "Total des dépenses"
-        )
+        self.carte_depenses = self._creer_carte(resume, "Total des dépenses")
 
-        self.carte_solde = self._creer_carte(
-            resume,
-            "Solde"
+        self.carte_solde = self._creer_carte(resume, "Solde")
+
+        # Séparer les transactions réalisées et les opérations à venir
+        navigation = ctk.CTkFrame(self, fg_color="transparent")
+        navigation.pack(fill="x", padx=25, pady=(0, 10))
+
+        self.filtre_statut = ctk.CTkSegmentedButton(
+            navigation,
+            values=["Réalisées", "À venir"],
+            selected_color=self.vert,
+            selected_hover_color=self.vert_fonce,
+            command=self._changer_vue_transactions,
         )
+        self.filtre_statut.pack(side="left")
+        self.filtre_statut.set("Réalisées")
 
         # Filtres
-        filtres = ctk.CTkFrame(
-            self,
-            fg_color=self.blanc,
-            corner_radius=10
-        )
-        filtres.pack(
-            fill="x",
-            padx=25,
-            pady=(0, 15)
-        )
+        filtres = ctk.CTkFrame(self, fg_color=self.blanc, corner_radius=10)
+        filtres.pack(fill="x", padx=25, pady=(0, 15))
 
         self.recherche = ctk.CTkEntry(
             filtres,
             width=280,
             height=38,
-            placeholder_text="Rechercher une transaction..."
+            placeholder_text="Rechercher une transaction...",
         )
-        self.recherche.pack(
-            side="left",
-            padx=15,
-            pady=15
-        )
-        self.recherche.bind(
-            "<KeyRelease>",
-            lambda event: self._afficher_transactions()
-        )
+        self.recherche.pack(side="left", padx=15, pady=15)
+        self.recherche.bind("<KeyRelease>", lambda event: self._afficher_transactions())
 
         self.filtre_type = ctk.CTkOptionMenu(
             filtres,
-            values=[
-                "Toutes",
-                "Dépense",
-                "Revenu"
-            ],
+            values=["Toutes", "Dépense", "Revenu"],
             width=150,
             fg_color=self.vert,
             button_color=self.vert_fonce,
-            command=lambda valeur: self._afficher_transactions()
+            command=lambda valeur: self._afficher_transactions(),
         )
-        self.filtre_type.pack(
-            side="left",
-            padx=5
-        )
+        self.filtre_type.pack(side="left", padx=5)
         self.filtre_type.set("Toutes")
 
-        # Titre de la liste
-        ctk.CTkLabel(
-            self,
-            text="Historique des transactions",
-            font=("Arial", 18, "bold"),
-            text_color=self.texte
-        ).pack(
-            anchor="w",
-            padx=25,
-            pady=(5, 10)
+        self.tri_date = ctk.CTkOptionMenu(
+            filtres,
+            values=["Plus récentes", "Plus anciennes"],
+            width=160,
+            fg_color=self.vert,
+            button_color=self.vert_fonce,
+            command=lambda _valeur: self._afficher_transactions(),
         )
+        self.tri_date.pack(side="left", padx=5)
+        self.tri_date.set("Plus récentes")
+
+        # Titre de la liste
+        self.titre_liste = ctk.CTkLabel(
+            self,
+            text="Transactions réalisées",
+            font=("Arial", 18, "bold"),
+            text_color=self.texte,
+        )
+        self.titre_liste.pack(anchor="w", padx=25, pady=(5, 10))
 
         # Liste défilante
-        self.liste_transactions = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent"
-        )
-        self.liste_transactions.pack(
-            fill="both",
-            expand=True,
-            padx=25,
-            pady=(0, 20)
-        )
+        self.liste_transactions = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.liste_transactions.pack(fill="both", expand=True, padx=25, pady=(0, 20))
 
         self._afficher_transactions()
 
@@ -193,37 +153,18 @@ class VueTransactions(ctk.CTkFrame):
             fg_color=self.blanc,
             corner_radius=10,
             border_width=1,
-            border_color="#E5E5E5"
+            border_color="#E5E5E5",
         )
-        carte.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            padx=5
-        )
+        carte.pack(side="left", fill="x", expand=True, padx=5)
 
-        ctk.CTkLabel(
-            carte,
-            text=titre,
-            font=("Arial", 12),
-            text_color=self.gris
-        ).pack(
-            anchor="w",
-            padx=15,
-            pady=(15, 5)
+        ctk.CTkLabel(carte, text=titre, font=("Arial", 12), text_color=self.gris).pack(
+            anchor="w", padx=15, pady=(15, 5)
         )
 
         montant = ctk.CTkLabel(
-            carte,
-            text="0,00 €",
-            font=("Arial", 22, "bold"),
-            text_color=self.texte
+            carte, text="0,00 €", font=("Arial", 22, "bold"), text_color=self.texte
         )
-        montant.pack(
-            anchor="w",
-            padx=15,
-            pady=(0, 15)
-        )
+        montant.pack(anchor="w", padx=15, pady=(0, 15))
 
         return montant
 
@@ -232,44 +173,29 @@ class VueTransactions(ctk.CTkFrame):
 
         texte = f"{Decimal(str(montant)):,.2f}"
 
-        return (
-            texte.replace(",", " ")
-            .replace(".", ",")
-            + " €"
-        )
+        return texte.replace(",", " ").replace(".", ",") + " €"
 
     def actualiser(self, transactions, resume=None):
-        """Actualiser les transactions affichées.
+        """Actualiser les transactions et leur résumé.
 
-        Chaque transaction contient :
-            id, date, libelle, type,
-            categorie, montant.
-
-        resume contient :
-            revenus, depenses, solde.
-
-        Les calculs sont effectués à l'extérieur.
+        Args:
+            transactions: Revenus et dépenses à afficher.
+            resume: Totaux facultatifs des transactions.
         """
 
         self.transactions = list(transactions)
 
         if resume is not None:
             self.carte_revenus.configure(
-                text=self._formater_montant(
-                    resume.get("revenus", 0)
-                )
+                text=self._formater_montant(resume.get("revenus", 0))
             )
 
             self.carte_depenses.configure(
-                text=self._formater_montant(
-                    resume.get("depenses", 0)
-                )
+                text=self._formater_montant(resume.get("depenses", 0))
             )
 
             self.carte_solde.configure(
-                text=self._formater_montant(
-                    resume.get("solde", 0)
-                )
+                text=self._formater_montant(resume.get("solde", 0))
             )
         else:
             # Résumé non fourni
@@ -280,58 +206,133 @@ class VueTransactions(ctk.CTkFrame):
         self._afficher_transactions()
 
     def definir_categories(self, categories):
-        """Recevoir les catégories disponibles."""
+        """Définir les catégories disponibles dans le formulaire.
+
+        Args:
+            categories: Catégories et sous-catégories sélectionnables.
+        """
 
         self.categories = list(categories)
 
-    def _afficher_transactions(self):
-        """Afficher les transactions selon les filtres."""
+    def _changer_vue_transactions(self, valeur: str) -> None:
+        """Changer la période affichée dans la liste des transactions.
 
+        Args:
+            valeur: Onglet sélectionné, réalisé ou à venir.
+
+        Returns:
+            None.
+        """
+        if valeur == "À venir":
+            self.tri_date.set("Plus anciennes")
+        else:
+            self.tri_date.set("Plus récentes")
+
+        self._afficher_transactions()
+
+    def _afficher_transactions(self) -> None:
+        """Afficher les transactions selon leur statut et les filtres.
+
+        Les opérations prévues sont séparées des revenus reçus et des
+        dépenses réalisées. Le tri et la recherche restent disponibles.
+
+        Returns:
+            None.
+        """
         # Nettoyer la liste
         for widget in self.liste_transactions.winfo_children():
             widget.destroy()
 
         recherche = self.recherche.get().strip().lower()
-        filtre = self.filtre_type.get()
+        filtre_type = self.filtre_type.get()
+        filtre_statut = self.filtre_statut.get()
+
+        # Actualiser le titre
+        titre = (
+            "Transactions à venir"
+            if filtre_statut == "À venir"
+            else "Transactions réalisées"
+        )
+        self.titre_liste.configure(text=titre)
 
         transactions_filtrees = []
 
         for transaction in self.transactions:
-            libelle = str(
-                transaction.get("libelle", "")
-            ).lower()
+            libelle = str(transaction.get("libelle", "")).lower()
+            categorie = str(transaction.get("categorie", "")).lower()
+            type_transaction = transaction.get("type", "Dépense")
+            statut = transaction.get("statut", "")
 
-            categorie = str(
-                transaction.get("categorie", "")
-            ).lower()
+            # Identifier les opérations prévues
+            est_a_venir = statut in ("prevu", "prevue")
 
-            type_transaction = transaction.get(
-                "type",
-                "Dépense"
-            )
+            # Filtrer selon l'onglet sélectionné
+            if filtre_statut == "À venir" and not est_a_venir:
+                continue
+
+            if filtre_statut == "Réalisées" and est_a_venir:
+                continue
 
             # Filtre de recherche
-            if (
-                recherche not in libelle
-                and recherche not in categorie
-            ):
+            if recherche not in libelle and recherche not in categorie:
                 continue
 
             # Filtre par type
-            if (
-                filtre != "Toutes"
-                and type_transaction != filtre
-            ):
+            if filtre_type != "Toutes" and type_transaction != filtre_type:
                 continue
 
             transactions_filtrees.append(transaction)
+
+        def cle_date(transaction):
+            """Obtenir la date utilisée pour le tri.
+
+            Args:
+                transaction: Transaction contenant la date à comparer.
+
+            Returns:
+                La date de la transaction ou une date minimale.
+            """
+            try:
+                return datetime.strptime(
+                    str(transaction.get("date", "")),
+                    "%d/%m/%Y",
+                )
+            except ValueError:
+                return datetime.min
+
+        transactions_filtrees.sort(
+            key=cle_date,
+            reverse=self.tri_date.get() == "Plus récentes",
+        )
 
         if not transactions_filtrees:
             ctk.CTkLabel(
                 self.liste_transactions,
                 text="Aucune transaction à afficher.",
                 font=("Arial", 14),
-                text_color=self.gris
+                text_color=self.gris,
+            ).pack(pady=50)
+            return
+
+        for transaction in transactions_filtrees:
+            self._creer_ligne_transaction(transaction)
+
+        def cle_date(transaction):
+            try:
+                return datetime.strptime(str(transaction.get("date", "")), "%d/%m/%Y")
+            except ValueError:
+                return datetime.min
+
+        transactions_filtrees.sort(
+            key=cle_date, reverse=self.tri_date.get() == "Plus récentes"
+        )
+
+        if not transactions_filtrees:
+            ctk.CTkLabel(
+                self.liste_transactions,
+                text="Aucune transaction à afficher.",
+                font=("Arial", 14),
+                text_color=self.gris,
             ).pack(pady=50)
 
             return
@@ -347,22 +348,12 @@ class VueTransactions(ctk.CTkFrame):
             fg_color=self.blanc,
             corner_radius=10,
             border_width=1,
-            border_color="#E5E5E5"
+            border_color="#E5E5E5",
         )
-        ligne.pack(
-            fill="x",
-            pady=5
-        )
+        ligne.pack(fill="x", pady=5)
 
-        contenu = ctk.CTkFrame(
-            ligne,
-            fg_color="transparent"
-        )
-        contenu.pack(
-            fill="x",
-            padx=15,
-            pady=12
-        )
+        contenu = ctk.CTkFrame(ligne, fg_color="transparent")
+        contenu.pack(fill="x", padx=15, pady=12)
 
         # Date
         ctk.CTkLabel(
@@ -370,7 +361,7 @@ class VueTransactions(ctk.CTkFrame):
             text=str(transaction.get("date", "")),
             width=100,
             anchor="w",
-            text_color=self.gris
+            text_color=self.gris,
         ).pack(side="left", padx=5)
 
         # Libellé
@@ -380,7 +371,7 @@ class VueTransactions(ctk.CTkFrame):
             width=200,
             anchor="w",
             text_color=self.texte,
-            font=("Arial", 13, "bold")
+            font=("Arial", 13, "bold"),
         ).pack(side="left", padx=5)
 
         # Catégorie
@@ -389,37 +380,24 @@ class VueTransactions(ctk.CTkFrame):
             text=str(transaction.get("categorie", "")),
             width=120,
             anchor="w",
-            text_color=self.gris
+            text_color=self.gris,
         ).pack(side="left", padx=5)
 
         # Type et montant
-        type_transaction = transaction.get(
-            "type",
-            "Dépense"
-        )
+        type_transaction = transaction.get("type", "Dépense")
 
-        couleur = (
-            self.vert
-            if type_transaction == "Revenu"
-            else self.rouge
-        )
+        couleur = self.vert if type_transaction == "Revenu" else self.rouge
 
-        signe = (
-            "+"
-            if type_transaction == "Revenu"
-            else "-"
-        )
+        signe = "+" if type_transaction == "Revenu" else "-"
 
-        montant = self._formater_montant(
-            transaction.get("montant", 0)
-        )
+        montant = self._formater_montant(transaction.get("montant", 0))
 
         ctk.CTkLabel(
             contenu,
             text=f"{signe}{montant}",
             width=110,
             text_color=couleur,
-            font=("Arial", 13, "bold")
+            font=("Arial", 13, "bold"),
         ).pack(side="left", padx=5)
 
         # Boutons d'action
@@ -431,9 +409,7 @@ class VueTransactions(ctk.CTkFrame):
             fg_color="#E8F3EF",
             hover_color="#D3E8DF",
             text_color=self.vert,
-            command=lambda t=transaction: (
-                self.ouvrir_modification(t)
-            )
+            command=lambda t=transaction: self.ouvrir_modification(t),
         ).pack(side="right", padx=3)
 
         ctk.CTkButton(
@@ -444,9 +420,7 @@ class VueTransactions(ctk.CTkFrame):
             fg_color="#FCE8E8",
             hover_color="#F5D0D0",
             text_color=self.rouge,
-            command=lambda t=transaction: (
-                self.supprimer_transaction(t)
-            )
+            command=lambda t=transaction: self.supprimer_transaction(t),
         ).pack(side="right", padx=3)
 
     def ouvrir_ajout(self):
@@ -455,7 +429,11 @@ class VueTransactions(ctk.CTkFrame):
         self._ouvrir_formulaire()
 
     def ouvrir_modification(self, transaction):
-        """Ouvrir le formulaire de modification."""
+        """Ouvrir le formulaire de modification d'une transaction.
+
+        Args:
+            transaction: Transaction à préremplir dans le formulaire.
+        """
 
         self._ouvrir_formulaire(transaction)
 
@@ -466,13 +444,11 @@ class VueTransactions(ctk.CTkFrame):
 
         fenetre = ctk.CTkToplevel(self)
         fenetre.title(
-            "Modifier une transaction"
-            if modification
-            else "Ajouter une transaction"
+            "Modifier une transaction" if modification else "Ajouter une transaction"
         )
-        #fenetre.geometry("450x540")
-        
-        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 560)
+        # fenetre.geometry("450x540")
+
+        centrer_fenetre(fenetre, self.winfo_toplevel(), 450, 720)
         fenetre.resizable(False, False)
         fenetre.configure(fg_color=self.beige)
         fenetre.transient(self.winfo_toplevel())
@@ -481,59 +457,48 @@ class VueTransactions(ctk.CTkFrame):
         ctk.CTkLabel(
             fenetre,
             text=(
-                "Modifier une transaction"
-                if modification
-                else "Nouvelle transaction"
+                "Modifier une transaction" if modification else "Nouvelle transaction"
             ),
             font=("Arial", 22, "bold"),
-            text_color=self.texte
+            text_color=self.texte,
         ).pack(pady=(20, 15))
 
         # Type
-        ctk.CTkLabel(
-            fenetre,
-            text="Type de transaction",
-            text_color=self.texte
-        ).pack(anchor="w", padx=55)
+        ctk.CTkLabel(fenetre, text="Type de transaction", text_color=self.texte).pack(
+            anchor="w", padx=55
+        )
 
         champ_type = ctk.CTkOptionMenu(
             fenetre,
             values=["Dépense", "Revenu"],
             width=340,
             fg_color=self.vert,
-            button_color=self.vert_fonce
+            button_color=self.vert_fonce,
         )
         champ_type.pack(pady=(5, 12))
+        if modification:
+            # Une conversion revenu/dépense doit être une suppression puis un ajout :
+            # les deux objets ne reposent pas sur les mêmes données métier.
+            champ_type.configure(state="disabled")
 
         # Libellé
         champ_libelle = ctk.CTkEntry(
-            fenetre,
-            width=340,
-            height=40,
-            placeholder_text="Libellé"
+            fenetre, width=340, height=40, placeholder_text="Libellé"
         )
         champ_libelle.pack(pady=8)
 
         # Montant
         champ_montant = ctk.CTkEntry(
-            fenetre,
-            width=340,
-            height=40,
-            placeholder_text="Montant (€)"
+            fenetre, width=340, height=40, placeholder_text="Montant (€)"
         )
         champ_montant.pack(pady=8)
 
         # Catégorie
-        ctk.CTkLabel(
-            fenetre,
-            text="Catégorie",
-            text_color=self.texte
-        ).pack(anchor="w", padx=55)
+        label_categorie = ctk.CTkLabel(fenetre, text="Catégorie", text_color=self.texte)
+        label_categorie.pack(anchor="w", padx=55)
 
         valeurs_categories = (
-            self.categories
-            if self.categories
-            else ["Sans catégorie"]
+            self.categories if self.categories else ["Aucun budget disponible"]
         )
 
         champ_categorie = ctk.CTkOptionMenu(
@@ -541,34 +506,54 @@ class VueTransactions(ctk.CTkFrame):
             values=valeurs_categories,
             width=340,
             fg_color=self.vert,
-            button_color=self.vert_fonce
+            button_color=self.vert_fonce,
         )
         champ_categorie.pack(pady=(5, 12))
+
+        aide_categorie = ctk.CTkLabel(
+            fenetre, text="", text_color=self.gris, font=("Arial", 11)
+        )
+        aide_categorie.pack(anchor="w", padx=55, pady=(0, 3))
+
+        def actualiser_categorie(type_transaction):
+            if type_transaction == "Revenu":
+                label_categorie.configure(text="Type de revenu")
+                champ_categorie.configure(values=self.CATEGORIES_REVENUS)
+                champ_categorie.set(self.CATEGORIES_REVENUS[0])
+                aide_categorie.configure(
+                    text="Un revenu n'est rattaché à aucun budget de dépense."
+                )
+            else:
+                label_categorie.configure(text="Budget de dépense")
+                champ_categorie.configure(values=valeurs_categories)
+                champ_categorie.set(valeurs_categories[0])
+                aide_categorie.configure(
+                    text="La dépense sera déduite du budget sélectionné."
+                )
+
+        champ_type.configure(command=actualiser_categorie)
+        actualiser_categorie("Dépense")
 
         # Date : saisie manuelle ou sélection dans un calendrier
         zone_date = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
         zone_date.pack(pady=8)
 
         champ_date = ctk.CTkEntry(
-            zone_date,
-            width=290,
-            height=40,
-            placeholder_text="Date (JJ/MM/AAAA)"
+            zone_date, width=290, height=40, placeholder_text="Date (JJ/MM/AAAA)"
         )
         champ_date.pack(side="left")
 
-        def ouvrir_calendrier():
+        def ouvrir_calendrier(champ, titre="Choisir une date"):
             """Afficher un calendrier pour le champ date du formulaire."""
             calendrier_fenetre = ctk.CTkToplevel(fenetre)
-            calendrier_fenetre.title("Choisir une date")
+            calendrier_fenetre.title(titre)
             calendrier_fenetre.resizable(False, False)
             calendrier_fenetre.transient(fenetre)
-            centrer_fenetre(calendrier_fenetre, fenetre, 240, 210)
+            centrer_fenetre(calendrier_fenetre, fenetre, 300, 300)
+            calendrier_fenetre.grab_set()
 
             try:
-                date_initiale = datetime.strptime(
-                    champ_date.get().strip(), "%d/%m/%Y"
-                )
+                date_initiale = datetime.strptime(champ.get().strip(), "%d/%m/%Y")
             except ValueError:
                 date_initiale = datetime.now()
 
@@ -585,13 +570,13 @@ class VueTransactions(ctk.CTkFrame):
                 selectbackground="#00634F",
                 selectforeground="white",
                 headersbackground="#E8F2EE",
-                headersforeground="#172326"
+                headersforeground="#172326",
             )
             calendrier.pack(padx=16, pady=(16, 10))
 
             def choisir_date():
-                champ_date.delete(0, "end")
-                champ_date.insert(0, calendrier.get_date())
+                champ.delete(0, "end")
+                champ.insert(0, calendrier.get_date())
                 calendrier_fenetre.destroy()
 
             ctk.CTkButton(
@@ -599,7 +584,7 @@ class VueTransactions(ctk.CTkFrame):
                 text="Choisir cette date",
                 fg_color=self.vert,
                 hover_color=self.vert_fonce,
-                command=choisir_date
+                command=choisir_date,
             ).pack(fill="x", padx=16, pady=(0, 16))
 
             calendrier_fenetre.after(100, calendrier_fenetre.lift)
@@ -612,53 +597,80 @@ class VueTransactions(ctk.CTkFrame):
             fg_color="#E8F2EE",
             text_color="#00634F",
             hover_color="#D6E9E1",
-            command=ouvrir_calendrier
+            command=lambda: ouvrir_calendrier(champ_date),
         ).pack(side="left", padx=(10, 0))
+
+        zone_recurrence = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
+        zone_recurrence.pack(pady=(4, 8))
+        ctk.CTkLabel(
+            zone_recurrence,
+            text="Récurrence",
+            text_color=self.texte,
+            width=100,
+            anchor="w",
+        ).pack(side="left")
+        champ_frequence = ctk.CTkOptionMenu(
+            zone_recurrence,
+            values=["Aucune", "Hebdomadaire", "Mensuelle", "Annuelle"],
+            width=230,
+            fg_color=self.vert,
+            button_color=self.vert_fonce,
+        )
+        champ_frequence.pack(side="left", padx=(10, 0))
+        champ_frequence.set("Aucune")
+
+        zone_fin = ctk.CTkFrame(fenetre, fg_color="transparent", width=340)
+        zone_fin.pack(pady=(0, 8))
+        champ_date_fin = ctk.CTkEntry(
+            zone_fin,
+            width=290,
+            height=40,
+            placeholder_text="Fin de récurrence (JJ/MM/AAAA)",
+        )
+        champ_date_fin.pack(side="left")
+        ctk.CTkButton(
+            zone_fin,
+            text="📅",
+            width=40,
+            height=40,
+            fg_color="#E8F2EE",
+            text_color="#00634F",
+            hover_color="#D6E9E1",
+            command=lambda: ouvrir_calendrier(
+                champ_date_fin, "Choisir la fin de récurrence"
+            ),
+        ).pack(side="left", padx=(10, 0))
+        if modification:
+            champ_frequence.configure(state="disabled")
+            champ_date_fin.configure(state="disabled")
 
         # Préremplissage lors d'une modification
         if modification:
-            champ_type.set(
-                transaction.get("type", "Dépense")
-            )
+            champ_type.set(transaction.get("type", "Dépense"))
+            actualiser_categorie(champ_type.get())
 
-            champ_libelle.insert(
-                0,
-                str(transaction.get("libelle", ""))
-            )
+            champ_libelle.insert(0, str(transaction.get("libelle", "")))
 
-            champ_montant.insert(
-                0,
-                str(transaction.get("montant", ""))
-            )
+            champ_montant.insert(0, str(transaction.get("montant", "")))
 
-            categorie = transaction.get(
-                "categorie",
-                "Sans catégorie"
-            )
+            categorie = transaction.get("categorie", "Sans catégorie")
 
-            if categorie not in valeurs_categories:
-                champ_categorie.configure(
-                    values=valeurs_categories + [categorie]
-                )
+            categories_type = (
+                self.CATEGORIES_REVENUS
+                if champ_type.get() == "Revenu"
+                else valeurs_categories
+            )
+            if categorie not in categories_type:
+                champ_categorie.configure(values=categories_type + [categorie])
 
             champ_categorie.set(categorie)
 
-            champ_date.insert(
-                0,
-                str(transaction.get("date", ""))
-            )
+            champ_date.insert(0, str(transaction.get("date", "")))
         else:
-            champ_date.insert(
-                0,
-                datetime.now().strftime("%d/%m/%Y")
-            )
+            champ_date.insert(0, datetime.now().strftime("%d/%m/%Y"))
 
         # Message d'erreur
-        message = ctk.CTkLabel(
-            fenetre,
-            text="",
-            text_color=self.rouge
-        )
+        message = ctk.CTkLabel(fenetre, text="", text_color=self.rouge)
         message.pack(pady=5)
 
         def valider():
@@ -666,17 +678,19 @@ class VueTransactions(ctk.CTkFrame):
 
             type_transaction = champ_type.get()
             libelle = champ_libelle.get().strip()
-            texte_montant = (
-                champ_montant.get()
-                .strip()
-                .replace(",", ".")
-            )
+            texte_montant = champ_montant.get().strip().replace(",", ".")
             categorie = champ_categorie.get()
             date = champ_date.get().strip()
+            frequence = champ_frequence.get()
+            date_fin = champ_date_fin.get().strip()
 
             if not libelle or not texte_montant or not date:
+                message.configure(text="Veuillez remplir tous les champs.")
+                return
+
+            if type_transaction == "Dépense" and categorie == "Aucun budget disponible":
                 message.configure(
-                    text="Veuillez remplir tous les champs."
+                    text="Créez d'abord un budget pour enregistrer cette dépense."
                 )
                 return
 
@@ -684,25 +698,34 @@ class VueTransactions(ctk.CTkFrame):
             try:
                 montant = Decimal(texte_montant)
             except InvalidOperation:
-                message.configure(
-                    text="Montant invalide."
-                )
+                message.configure(text="Montant invalide.")
                 return
 
             if not montant.is_finite() or montant <= 0:
-                message.configure(
-                    text="Le montant doit être supérieur à zéro."
-                )
+                message.configure(text="Le montant doit être supérieur à zéro.")
                 return
 
             # Validation de la date
             try:
                 datetime.strptime(date, "%d/%m/%Y")
             except ValueError:
-                message.configure(
-                    text="Date invalide (JJ/MM/AAAA)."
-                )
+                message.configure(text="Date invalide (JJ/MM/AAAA).")
                 return
+
+            if frequence != "Aucune":
+                try:
+                    fin = datetime.strptime(date_fin, "%d/%m/%Y")
+                    debut = datetime.strptime(date, "%d/%m/%Y")
+                except ValueError:
+                    message.configure(
+                        text="Choisissez une date de fin de récurrence valide."
+                    )
+                    return
+                if fin < debut:
+                    message.configure(
+                        text="La fin de récurrence doit suivre la première date."
+                    )
+                    return
 
             # Données à transmettre
             donnees = {
@@ -710,29 +733,32 @@ class VueTransactions(ctk.CTkFrame):
                 "libelle": libelle,
                 "montant": montant,
                 "categorie": categorie,
-                "date": date
+                "date": date,
+                "frequence": frequence,
+                "date_fin": date_fin or None,
             }
 
             if modification:
                 if self.on_modifier is None:
-                    message.configure(
-                        text="Modification non configurée."
-                    )
+                    message.configure(text="Modification non configurée.")
                     return
 
-                self.on_modifier(
-                    transaction.get("id"),
-                    donnees
-                )
+                try:
+                    self.on_modifier(transaction.get("id"), donnees)
+                except (ConnectionError, OSError, ValueError, StopIteration) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             else:
                 if self.on_ajouter is None:
-                    message.configure(
-                        text="Ajout non configuré."
-                    )
+                    message.configure(text="Ajout non configuré.")
                     return
 
-                self.on_ajouter(donnees)
+                try:
+                    self.on_ajouter(donnees)
+                except (ConnectionError, OSError, ValueError) as erreur:
+                    message.configure(text=str(erreur))
+                    return
 
             fenetre.destroy()
 
@@ -743,43 +769,37 @@ class VueTransactions(ctk.CTkFrame):
             height=42,
             fg_color=self.vert,
             hover_color=self.vert_fonce,
-            command=valider
+            command=valider,
         ).pack(pady=10)
 
     def supprimer_transaction(self, transaction):
-        """Demander la suppression d'une transaction."""
+        """Demander la confirmation puis supprimer une transaction.
+
+        Args:
+            transaction: Transaction sélectionnée dans la liste.
+        """
 
         confirmation = messagebox.askyesno(
             "Confirmation",
             "Voulez-vous supprimer cette transaction ?",
-            parent=self.winfo_toplevel()
+            parent=self.winfo_toplevel(),
         )
 
         if not confirmation:
             return
 
         if self.on_supprimer:
-            self.on_supprimer(
-                transaction.get("id")
-            )
+            self.on_supprimer(transaction.get("id"))
         else:
             messagebox.showwarning(
                 "Action indisponible",
                 "La suppression n'est pas configurée.",
-                parent=self.winfo_toplevel()
+                parent=self.winfo_toplevel(),
             )
 
     def vider(self):
         """Réinitialiser l'affichage."""
 
         self.actualiser(
-            transactions=[],
-            resume={
-                "revenus": 0,
-                "depenses": 0,
-                "solde": 0
-            }
+            transactions=[], resume={"revenus": 0, "depenses": 0, "solde": 0}
         )
-
-
-
