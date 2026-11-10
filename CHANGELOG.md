@@ -24,6 +24,9 @@
   80 %, les projections et la gestion complète des catégories et objectifs
   dans le protocole JSON/TCP.
 
+- Prolonger automatiquement le budget sélectionné sur les mois futurs d'une
+  dépense récurrente, après validation complète du solde disponible.
+
 - Ajouter des versements d'épargne persistants, déduits du solde disponible et
   intégrés aux contrôles empêchant les dépenses à découvert.
 

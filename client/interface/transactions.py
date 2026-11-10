@@ -81,6 +81,20 @@ class VueTransactions(ctk.CTkFrame):
 
         self.carte_solde = self._creer_carte(resume, "Solde")
 
+        # Séparer les transactions réalisées et les opérations à venir
+        navigation = ctk.CTkFrame(self, fg_color="transparent")
+        navigation.pack(fill="x", padx=25, pady=(0, 10))
+
+        self.filtre_statut = ctk.CTkSegmentedButton(
+            navigation,
+            values=["Réalisées", "À venir"],
+            selected_color=self.vert,
+            selected_hover_color=self.vert_fonce,
+            command=self._changer_vue_transactions,
+        )
+        self.filtre_statut.pack(side="left")
+        self.filtre_statut.set("Réalisées")
+
         # Filtres
         filtres = ctk.CTkFrame(self, fg_color=self.blanc, corner_radius=10)
         filtres.pack(fill="x", padx=25, pady=(0, 15))
@@ -117,12 +131,13 @@ class VueTransactions(ctk.CTkFrame):
         self.tri_date.set("Plus récentes")
 
         # Titre de la liste
-        ctk.CTkLabel(
+        self.titre_liste = ctk.CTkLabel(
             self,
-            text="Historique des transactions",
+            text="Transactions réalisées",
             font=("Arial", 18, "bold"),
             text_color=self.texte,
-        ).pack(anchor="w", padx=25, pady=(5, 10))
+        )
+        self.titre_liste.pack(anchor="w", padx=25, pady=(5, 10))
 
         # Liste défilante
         self.liste_transactions = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -199,34 +214,108 @@ class VueTransactions(ctk.CTkFrame):
 
         self.categories = list(categories)
 
-    def _afficher_transactions(self):
-        """Afficher les transactions selon les filtres."""
+    def _changer_vue_transactions(self, valeur: str) -> None:
+        """Changer la période affichée dans la liste des transactions.
 
+        Args:
+            valeur: Onglet sélectionné, réalisé ou à venir.
+
+        Returns:
+            None.
+        """
+        if valeur == "À venir":
+            self.tri_date.set("Plus anciennes")
+        else:
+            self.tri_date.set("Plus récentes")
+
+        self._afficher_transactions()
+
+    def _afficher_transactions(self) -> None:
+        """Afficher les transactions selon leur statut et les filtres.
+
+        Les opérations prévues sont séparées des revenus reçus et des
+        dépenses réalisées. Le tri et la recherche restent disponibles.
+
+        Returns:
+            None.
+        """
         # Nettoyer la liste
         for widget in self.liste_transactions.winfo_children():
             widget.destroy()
 
         recherche = self.recherche.get().strip().lower()
-        filtre = self.filtre_type.get()
+        filtre_type = self.filtre_type.get()
+        filtre_statut = self.filtre_statut.get()
+
+        # Actualiser le titre
+        titre = (
+            "Transactions à venir"
+            if filtre_statut == "À venir"
+            else "Transactions réalisées"
+        )
+        self.titre_liste.configure(text=titre)
 
         transactions_filtrees = []
 
         for transaction in self.transactions:
             libelle = str(transaction.get("libelle", "")).lower()
-
             categorie = str(transaction.get("categorie", "")).lower()
-
             type_transaction = transaction.get("type", "Dépense")
+            statut = transaction.get("statut", "")
+
+            # Identifier les opérations prévues
+            est_a_venir = statut in ("prevu", "prevue")
+
+            # Filtrer selon l'onglet sélectionné
+            if filtre_statut == "À venir" and not est_a_venir:
+                continue
+
+            if filtre_statut == "Réalisées" and est_a_venir:
+                continue
 
             # Filtre de recherche
             if recherche not in libelle and recherche not in categorie:
                 continue
 
             # Filtre par type
-            if filtre != "Toutes" and type_transaction != filtre:
+            if filtre_type != "Toutes" and type_transaction != filtre_type:
                 continue
 
             transactions_filtrees.append(transaction)
+
+        def cle_date(transaction):
+            """Obtenir la date utilisée pour le tri.
+
+            Args:
+                transaction: Transaction contenant la date à comparer.
+
+            Returns:
+                La date de la transaction ou une date minimale.
+            """
+            try:
+                return datetime.strptime(
+                    str(transaction.get("date", "")),
+                    "%d/%m/%Y",
+                )
+            except ValueError:
+                return datetime.min
+
+        transactions_filtrees.sort(
+            key=cle_date,
+            reverse=self.tri_date.get() == "Plus récentes",
+        )
+
+        if not transactions_filtrees:
+            ctk.CTkLabel(
+                self.liste_transactions,
+                text="Aucune transaction à afficher.",
+                font=("Arial", 14),
+                text_color=self.gris,
+            ).pack(pady=50)
+            return
+
+        for transaction in transactions_filtrees:
+            self._creer_ligne_transaction(transaction)
 
         def cle_date(transaction):
             try:

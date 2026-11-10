@@ -58,16 +58,29 @@ class GestionnaireDepenses:
         return self._repository.ajouter_depense(**donnees)
 
     def preparer_depenses_recurrentes(
-        self, identifiant_utilisateur: int, depense: dict[str, Any]
+        self,
+        identifiant_utilisateur: int,
+        depense: dict[str, Any],
+        *,
+        creer_budgets_manquants: bool = False,
     ) -> list[dict[str, Any]]:
         """Préparer et valider une série avant toute écriture.
+
+        Chaque occurrence est associée au budget de son mois. Les budgets
+        manquants peuvent être préparés à partir du budget de référence.
 
         Args:
             identifiant_utilisateur: Identifiant du propriétaire des dépenses.
             depense: Dépense commune et paramètres de récurrence.
+            creer_budgets_manquants: Autoriser la création des budgets absents.
 
         Returns:
-            Les occurrences validées avec le budget propre à chaque mois.
+            Les occurrences validées avec le budget propre à chaque mois
+            et les éventuels budgets à créer.
+
+        Raises:
+            ValueError: Si les dates, le budget ou le classement sont invalides.
+            ValueError: Si un budget manque et que sa création est interdite.
         """
         try:
             debut = date.fromisoformat(depense["date"])
@@ -78,54 +91,108 @@ class GestionnaireDepenses:
             )
         except (KeyError, TypeError, ValueError) as erreur:
             raise ValueError("Les dates de récurrence sont invalides.") from erreur
+
         occurrences = generer_dates_recurrence(
             debut, depense.get("frequence", "Aucune"), fin
         )
+
+        try:
+            categorie_id = int(depense["categorie_id"])
+            sous_categorie_id = (
+                int(depense["sous_categorie_id"])
+                if depense.get("sous_categorie_id") is not None
+                else None
+            )
+
+            budget_source = self._budgets.consulter_allocation(
+                identifiant_utilisateur, int(depense["budget_id"])
+            )
+        except (KeyError, TypeError, ValueError) as erreur:
+            raise ValueError(
+                "Le budget servant de modèle à la récurrence est invalide."
+            ) from erreur
+
+        if (
+            budget_source["categorie_id"] != categorie_id
+            or budget_source.get("sous_categorie_id") != sous_categorie_id
+        ):
+            raise ValueError(
+                "Le budget sélectionné ne correspond pas au classement."
+            )
+
         aujourd_hui = date.today()
         resultat = []
+
         for occurrence in occurrences:
             correspondances = [
                 budget
                 for budget in self._budgets.consulter_budget(
-                    identifiant_utilisateur, occurrence.year, occurrence.month
+                    identifiant_utilisateur,
+                    occurrence.year,
+                    occurrence.month,
                 )
-                if budget["categorie_id"] == int(depense["categorie_id"])
-                and budget.get("sous_categorie_id")
-                == depense.get("sous_categorie_id")
+                if budget["categorie_id"] == categorie_id
+                and budget.get("sous_categorie_id") == sous_categorie_id
             ]
-            if not correspondances:
+
+            if not correspondances and not creer_budgets_manquants:
                 raise ValueError(
                     "Aucun budget compatible pour le mois "
                     f"{occurrence.month:02d}/{occurrence.year}."
                 )
+
+            budget = correspondances[0] if correspondances else budget_source
+
             donnees = self._valider(
                 {
                     **depense,
                     "utilisateur_id": identifiant_utilisateur,
-                    "budget_id": correspondances[0]["id"],
+                    "budget_id": budget["id"],
                     "date": occurrence.isoformat(),
-                    "statut": "realisee"
-                    if occurrence <= aujourd_hui
-                    else "prevue",
+                    "statut": (
+                        "realisee"
+                        if occurrence <= aujourd_hui
+                        else "prevue"
+                    ),
                 }
             )
+
             self._verifier_liens(donnees)
+
+            if not correspondances:
+                donnees["_budget_a_creer"] = {
+                    "utilisateur_id": identifiant_utilisateur,
+                    "annee": occurrence.year,
+                    "mois": occurrence.month,
+                    "categorie_id": budget_source["categorie_id"],
+                    "sous_categorie_id": budget_source.get("sous_categorie_id"),
+                    "montant_alloue": budget_source["montant_alloue"],
+                    "obligatoire": bool(budget_source.get("obligatoire")),
+                }
+
             resultat.append(donnees)
+
         return resultat
 
     def enregistrer_depenses_preparees(
         self, depenses: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Persister une série déjà validée.
+        """Persister une série de dépenses déjà validées.
+
+        Les budgets manquants et les dépenses sont enregistrés dans une
+        transaction SQLite unique afin d'éviter toute création partielle.
 
         Args:
             depenses: Occurrences produites par
                 :meth:`preparer_depenses_recurrentes`.
 
         Returns:
-            Les dépenses enregistrées.
+            Les dépenses enregistrées avec leurs identifiants définitifs.
+
+        Raises:
+            sqlite3.Error: Si une opération de persistance échoue.
         """
-        return [self._repository.ajouter_depense(**depense) for depense in depenses]
+        return self._repository.ajouter_depenses_recurrentes(depenses)
 
     def modifier_depense(
         self,

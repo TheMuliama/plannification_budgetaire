@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from persistance.database import Database
 from serveur.application import ApplicationServeur
 
@@ -119,22 +121,19 @@ def test_creer_une_recurrence_et_gerer_les_categories_par_le_serveur() -> None:
     assert application.lister_categories({"session": session}) == []
 
 
-def test_rattacher_chaque_depense_recurrente_au_budget_de_son_mois() -> None:
-    """Éviter qu'une série récurrente réutilise le budget du premier mois."""
+def test_prolonger_le_budget_pour_une_depense_recurrente() -> None:
+    """Créer les budgets futurs manquants à partir du budget sélectionné."""
     application, session = _application_authentifiee()
     categorie = application.creer_categorie({"session": session, "nom": "Abonnement"})
-    budgets = [
-        application.creer_budget(
-            {
-                "session": session,
-                "annee": 2026,
-                "mois": mois,
-                "categorie_id": categorie["id"],
-                "montant_alloue": 50,
-            }
-        )
-        for mois in (11, 12)
-    ]
+    budget_novembre = application.creer_budget(
+        {
+            "session": session,
+            "annee": 2026,
+            "mois": 11,
+            "categorie_id": categorie["id"],
+            "montant_alloue": 50,
+        }
+    )
     application.creer_revenu(
         {
             "session": session,
@@ -146,6 +145,7 @@ def test_rattacher_chaque_depense_recurrente_au_budget_de_son_mois() -> None:
     depenses = application.creer_depenses_recurrentes(
         {
             "session": session,
+            "budget_id": budget_novembre["id"],
             "categorie_id": categorie["id"],
             "sous_categorie_id": None,
             "montant": 10,
@@ -153,11 +153,57 @@ def test_rattacher_chaque_depense_recurrente_au_budget_de_son_mois() -> None:
             "date_fin": "2026-12-05",
             "frequence": "Mensuelle",
             "description": "Service",
+            "creer_budgets_manquants": True,
         }
     )
+    budget_decembre = application.lister_budgets(
+        {"session": session, "annee": 2026, "mois": 12}
+    )
+    assert len(budget_decembre) == 1
+    assert budget_decembre[0]["montant_alloue"] == 50
     assert [depense["budget_id"] for depense in depenses] == [
-        budgets[0]["id"],
-        budgets[1]["id"],
+        budget_novembre["id"],
+        budget_decembre[0]["id"],
     ]
     assert [depense["statut"] for depense in depenses] == ["realisee", "prevue"]
     assert application.obtenir_solde({"session": session})["disponible"] == 90
+
+
+def test_ne_pas_creer_de_budget_si_la_recurrence_est_refusee() -> None:
+    """Valider le solde avant de prolonger les budgets mensuels."""
+    application, session = _application_authentifiee()
+    categorie = application.creer_categorie({"session": session, "nom": "Service"})
+    budget = application.creer_budget(
+        {
+            "session": session,
+            "annee": 2026,
+            "mois": 11,
+            "categorie_id": categorie["id"],
+            "montant_alloue": 50,
+        }
+    )
+    application.creer_revenu(
+        {
+            "session": session,
+            "montant": 5,
+            "date": "2026-11-01",
+            "statut": "recu",
+        }
+    )
+    with pytest.raises(ValueError, match="Solde insuffisant"):
+        application.creer_depenses_recurrentes(
+            {
+                "session": session,
+                "budget_id": budget["id"],
+                "categorie_id": categorie["id"],
+                "sous_categorie_id": None,
+                "montant": 10,
+                "date": "2026-11-05",
+                "date_fin": "2026-12-05",
+                "frequence": "Mensuelle",
+                "creer_budgets_manquants": True,
+            }
+        )
+    assert application.lister_budgets(
+        {"session": session, "annee": 2026, "mois": 12}
+    ) == []

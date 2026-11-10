@@ -471,7 +471,9 @@ class ApplicationServeur:
         """
         identifiant_utilisateur = self._identifiant_utilisateur(donnees)
         depenses = self.depenses.preparer_depenses_recurrentes(
-            identifiant_utilisateur, donnees
+            identifiant_utilisateur,
+            donnees,
+            creer_budgets_manquants=donnees.get("creer_budgets_manquants") is True,
         )
         self.calculateur.verifier_depenses_recurrentes(
             identifiant_utilisateur, depenses

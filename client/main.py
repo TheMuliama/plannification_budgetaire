@@ -4,7 +4,8 @@ from datetime import datetime
 from decimal import Decimal
 
 import customtkinter as ctk
-from communication.api import ApiClient
+from tkinter import messagebox
+from communication.api import ApiClient, ErreurServeur
 from interface.alertes import VueAlertes
 from interface.budgets import VueBudgets
 from interface.connexion import Connexion
@@ -503,12 +504,46 @@ class ApplicationMonBudget(ctk.CTk):
                 raise ValueError(
                     "Aucun budget pour cette catégorie au mois de la transaction."
                 )
-            self.api.appeler(
-                "depenses.creer_recurrentes",
+            parametres = {
                 **recurrence,
-                categorie_id=budget["categorie_id"],
-                sous_categorie_id=budget["sous_categorie_id"],
-            )
+                "budget_id": budget["id"],
+                "categorie_id": budget["categorie_id"],
+                "sous_categorie_id": budget["sous_categorie_id"],
+            }
+
+            try:
+                self.api.appeler(
+                    "depenses.creer_recurrentes",
+                    **parametres,
+                    creer_budgets_manquants=False,
+                )
+
+            except ErreurServeur as erreur:
+                if not str(erreur).startswith("Aucun budget compatible pour le mois "):
+                    raise
+
+                confirmation = messagebox.askyesno(
+                    "Budgets mensuels manquants",
+                    (
+                        f"{erreur}\n\n"
+                        "Le budget du premier mois sera reconduit pour les "
+                        "mois manquants jusqu'à la fin de la récurrence.\n\n"
+                        "Les budgets existants ne seront pas modifiés.\n\n"
+                        "Créer ces budgets et enregistrer les dépenses ?"
+                    ),
+                    parent=self,
+                )
+
+                if not confirmation:
+                    raise ValueError(
+                        "Enregistrement annulé ; aucune donnée créée."
+                    ) from erreur
+
+                self.api.appeler(
+                    "depenses.creer_recurrentes",
+                    **parametres,
+                    creer_budgets_manquants=True,
+                )
         self.charger_donnees()
         self.actualiser_transactions()
 
