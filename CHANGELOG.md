@@ -15,8 +15,8 @@
 - Limiter le client à la saisie et à la présentation des tableaux de bord,
   budgets et alertes déjà calculés par les services métier.
 
-- Aligner le port publié par Docker Compose sur le port `8765` utilisé par le
-  client et documenter l'installation du serveur conteneurisé.
+- Aligner le client et Docker Compose sur le port serveur `8765`, puis
+  documenter l'installation du serveur conteneurisé.
 
 ### Added
 

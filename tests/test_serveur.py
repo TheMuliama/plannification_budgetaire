@@ -5,6 +5,13 @@ from pathlib import Path
 from persistance.database import Database
 from serveur.application import ApplicationServeur
 from serveur.communication.serveur_socket import ServeurSocket
+from client.communication.api import ApiClient
+
+
+def test_utiliser_le_port_serveur_par_defaut() -> None:
+    """Vérifier que le client cible le port local documenté."""
+    api = ApiClient()
+    assert api._port == 8765
 
 
 def test_router_une_requete_json() -> None:
