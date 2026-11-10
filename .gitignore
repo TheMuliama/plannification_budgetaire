@@ -38,7 +38,7 @@ dist/
 appimagetool.AppImage
 
 # ==========================================
-# SQLite et données locales
+# SQLite
 # ==========================================
 *.db
 *.db-journal
@@ -47,9 +47,11 @@ appimagetool.AppImage
 *.sqlite
 *.sqlite3
 
-# Conserver le dossier sans ses données
-persistance/data/*
-!persistance/data/.gitkeep
+# Autoriser uniquement la base de démonstration
+!persistance/data/demo.db
+
+# Autres données locales
+persistance/data/factures/
 
 # ==========================================
 # Docker
